@@ -1,2 +1,3 @@
 sample,fastq_1,fastq_2
-NA12878,data/samples/NA12878_R1.fastq.gz,data/samples/NA12878_R2.fastq.gz
+HG001,data/samples/HG001_R1.fastq.gz,data/samples/HG001_R2.fastq.gz
+HG002,data/samples/HG002_R1.fastq.gz,data/samples/HG002_R2.fastq.gz

@@ -2,31 +2,30 @@
 
 nextflow.enable.dsl=2
 
+// ── Parameters ────────────────────────────────────────────────────────────────
 params.samplesheet = 'data/samplesheet.csv'
 params.reference   = 'data/reference/chr20.fa'
 params.outdir      = 'data/outputs'
 
+// ── Load Samples ──────────────────────────────────────────────────────────────
 Channel
     .fromPath(params.samplesheet)
     .splitCsv(header: true)
     .map { row -> tuple(row.sample, [file(row.fastq_1), file(row.fastq_2)]) }
     .set { samples_ch }
 
+// ── Workflow ──────────────────────────────────────────────────────────────────
 workflow {
     indexReference(file(params.reference))
     faiReference(file(params.reference))
 
     align(samples_ch, file(params.reference), indexReference.out.index)
     sortBam(align.out)
-    callVariants(
-        sortBam.out,
-        file(params.reference),
-        faiReference.out.fai
-    )
+    callVariants(sortBam.out, file(params.reference), faiReference.out.fai)
     vcfQc(callVariants.out)
 }
 
-// ── Reference Indexes ────────────────────────────────────────────────────────
+// ── Reference Indexing ────────────────────────────────────────────────────────
 
 process indexReference {
     tag "bwa-mem2 index"
@@ -63,12 +62,13 @@ process faiReference {
     """
 }
 
-// ── Alignment ────────────────────────────────────────────────────────────────
+// ── Alignment ─────────────────────────────────────────────────────────────────
 
 process align {
     tag "${sample_id}"
     container 'dceoy/bwa-mem2:latest'
     containerOptions '--entrypoint='
+    publishDir "${params.outdir}/bam", mode: 'copy'
 
     input:
     tuple val(sample_id), path(reads)
@@ -80,11 +80,13 @@ process align {
 
     script:
     """
-    bwa-mem2 mem -t 4 ${reference} ${reads[0]} ${reads[1]} > ${sample_id}.sam
+    bwa-mem2 mem -t ${task.cpus} \
+      -R "@RG\\tID:${sample_id}\\tSM:${sample_id}\\tPL:ILLUMINA" \
+      ${reference} ${reads[0]} ${reads[1]} > ${sample_id}.sam
     """
 }
 
-// ── BAM Processing ───────────────────────────────────────────────────────────
+// ── BAM Processing ────────────────────────────────────────────────────────────
 
 process sortBam {
     tag "${sample_id}"
@@ -104,7 +106,7 @@ process sortBam {
     """
 }
 
-// ── Variant Calling ──────────────────────────────────────────────────────────
+// ── Variant Calling ───────────────────────────────────────────────────────────
 
 process callVariants {
     tag "${sample_id}"
@@ -114,9 +116,9 @@ process callVariants {
     memory '8 GB'
 
     input:
-    tuple val(sample_id), path(bam_file), path(bai_file)  // FIX: receive .bai
+    tuple val(sample_id), path(bam_file), path(bai_file)
     path(reference)
-    path(fai)                                              // FIX: receive .fai
+    path(fai)
 
     output:
     tuple val(sample_id), path("${sample_id}.vcf.gz"), emit: out
@@ -130,13 +132,14 @@ process callVariants {
       --ref=${reference} \
       --reads=${bam_file} \
       --output_vcf=output/${sample_id}.vcf.gz \
-      --num_shards=${task.cpus}
+      --num_shards=${task.cpus} \
+      --sample_name=${sample_id}
 
     mv output/${sample_id}.vcf.gz ${sample_id}.vcf.gz
     """
 }
 
-// ── VCF QC ───────────────────────────────────────────────────────────────────
+// ── VCF QC & Filtering ────────────────────────────────────────────────────────
 
 process vcfQc {
     tag "${sample_id}"
@@ -147,8 +150,8 @@ process vcfQc {
     tuple val(sample_id), path(vcf_file)
 
     output:
-    path "${sample_id}.final.vcf.gz", emit: out
-    path "${sample_id}.stats.txt",    emit: stats
+    path("${sample_id}.final.vcf.gz"), emit: vcf
+    path("${sample_id}.stats.txt"),    emit: stats
 
     script:
     """

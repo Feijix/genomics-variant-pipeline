@@ -1,6 +1,6 @@
 # genomics-variant-pipeline
 
-Nextflow DSL2 pipeline for human variant calling. Processes paired-end short-read FASTQ files and produces filtered VCF files compatible with Beacon v2.
+Nextflow DSL2 pipeline for human variant calling. Processes paired-end short-read FASTQ files and produces filtered VCF files compatible with Beacon v2. Supports multiple samples in parallel — each sample produces an independent VCF.
 
 ## Pipeline
 
@@ -48,29 +48,48 @@ If this fails, Docker is not running or your user lacks permission (`sudo usermo
 
 ```bash
 mkdir -p data/reference
-curl -O https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/GCA_000001405.15_GRCh38_assembly_structure/Primary_Assembly/assembled_chromosomes/FASTA/chr20.fna.gz
-gunzip chr20.fna.gz
-mv chr20.fna data/reference/chr20.fa
+curl -O https://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/chr20.fa.gz
+gunzip chr20.fa.gz
+mv chr20.fa data/reference/chr20.fa
 ```
 
-### 2. Get sample reads
+### 2. Generate synthetic sample reads
 
-Download real NA12878 reads from ENA (paired-end Illumina WGS, ~2 GB each):
+`wgsim` ships inside the samtools container — no extra install needed. The `-S` flag sets the random seed, giving each sample a distinct set of variants.
 
 ```bash
-curl -O https://ftp.sra.ebi.ac.uk/vol1/fastq/ERR194/ERR194147/ERR194147_1.fastq.gz
-curl -O https://ftp.sra.ebi.ac.uk/vol1/fastq/ERR194/ERR194147/ERR194147_2.fastq.gz
-mv ERR194147_*.fastq.gz data/
+mkdir -p data/samples
+
+# HG001 — seed 42
+docker run --rm -v $(pwd)/data:$(pwd)/data -w $(pwd)/data staphb/samtools:latest \
+  wgsim -S 42 -N 1000000 -1 150 -2 150 -e 0.001 -r 0.001 -R 0.0001 \
+  reference/chr20.fa \
+  samples/HG001_R1.fastq samples/HG001_R2.fastq
+
+# HG002 — seed 99
+docker run --rm -v $(pwd)/data:$(pwd)/data -w $(pwd)/data staphb/samtools:latest \
+  wgsim -S 99 -N 1000000 -1 150 -2 150 -e 0.001 -r 0.001 -R 0.0001 \
+  reference/chr20.fa \
+  samples/HG002_R1.fastq samples/HG002_R2.fastq
+
+# Compress
+gzip data/samples/HG001_R1.fastq data/samples/HG001_R2.fastq \
+     data/samples/HG002_R1.fastq data/samples/HG002_R2.fastq
 ```
+
+> **Note on synthetic data:** wgsim places variants randomly with no biological model. Ts/Tv ratio will be ~0.50 (random chance) rather than the ~2.0–2.1 expected from real human WGS data. This is expected and correct — use GIAB reads for biological validation.
 
 ### 3. Create the samplesheet
 
 ```bash
 cat > data/samplesheet.csv << EOF
 sample,fastq_1,fastq_2
-NA12878,data/ERR194147_1.fastq.gz,data/ERR194147_2.fastq.gz
+HG001,data/samples/HG001_R1.fastq.gz,data/samples/HG001_R2.fastq.gz
+HG002,data/samples/HG002_R1.fastq.gz,data/samples/HG002_R2.fastq.gz
 EOF
 ```
+
+Add or remove rows to process more or fewer samples. Each row runs independently through the full pipeline in parallel.
 
 ### 4. Run
 
@@ -78,17 +97,17 @@ EOF
 nextflow run main.nf -profile docker
 ```
 
-First run pulls Docker images and builds indexes (~10 min depending on connection). Subsequent runs skip both.
+First run pulls Docker images and builds reference indexes (~10 min depending on connection). Subsequent runs skip both.
 
 Expected output:
 
 ```
 [skipped  ] indexReference  | 1 of 1, stored ✔
 [skipped  ] faiReference    | 1 of 1, stored ✔
-[xx/xxxxxx] align           | 1 of 1 ✔
-[xx/xxxxxx] sortBam         | 1 of 1 ✔
-[xx/xxxxxx] callVariants    | 1 of 1 ✔
-[xx/xxxxxx] vcfQc           | 1 of 1 ✔
+[xx/xxxxxx] align           | 2 of 2 ✔
+[xx/xxxxxx] sortBam         | 2 of 2 ✔
+[xx/xxxxxx] callVariants    | 2 of 2 ✔
+[xx/xxxxxx] vcfQc           | 2 of 2 ✔
 ```
 
 ---
@@ -125,6 +144,8 @@ data/outputs/
     └── <sample>.stats.txt
 ```
 
+One set of outputs per sample, named by the `sample` column in the samplesheet.
+
 ---
 
 ## Inspecting Results
@@ -137,15 +158,21 @@ alias bcftools='docker run --rm -v $(pwd):$(pwd) -w $(pwd) staphb/bcftools:lates
 alias samtools='docker run --rm -v $(pwd):$(pwd) -w $(pwd) staphb/samtools:latest samtools'
 
 source ~/.bashrc
+```
 
-# Variant summary
-bcftools stats data/outputs/qc/NA12878.final.vcf.gz | grep "^SN"
+```bash
+# Variant counts per sample
+bcftools stats data/outputs/qc/HG001.final.vcf.gz | grep "^SN"
+bcftools stats data/outputs/qc/HG002.final.vcf.gz | grep "^SN"
 
-# Ts/Tv ratio (expect 2.0–2.1 for WGS)
-bcftools stats data/outputs/qc/NA12878.final.vcf.gz | grep "Ts/Tv"
+# Ts/Tv ratio
+# ~0.50 expected for synthetic data, ~2.0-2.1 for real WGS data
+bcftools stats data/outputs/qc/HG001.final.vcf.gz | grep "^TSTV"
+bcftools stats data/outputs/qc/HG002.final.vcf.gz | grep "^TSTV"
 
 # BAM alignment stats
-samtools flagstat data/outputs/bam/NA12878.sorted.bam
+samtools flagstat data/outputs/bam/HG001.sorted.bam
+samtools flagstat data/outputs/bam/HG002.sorted.bam
 ```
 
 ---
@@ -174,20 +201,29 @@ The `.fai` index was not staged into DeepVariant's work directory. Ensure `faiRe
 **`[E::idx_find_and_load] Could not retrieve index file for '*.bam'`**
 The `.bai` was not passed to `callVariants`. Ensure `sortBam` emits both the `.bam` and `.bai` in its output tuple.
 
-**All variants filtered out (0 records in output)**
-Expected behaviour with synthetic test data — there are no real variants to call. Use real FASTQ reads from GIAB to produce meaningful output.
+**`No non-empty sample name found in the input reads`**
+Read group tags are missing from the BAM. The `align` process adds them via `-R "@RG\tID:...\tSM:...\tPL:ILLUMINA"`. If you see this warning, check that the `-R` flag is present in the align script.
+
+**Ts/Tv is ~0.50 instead of ~2.0**
+Expected when using synthetic data generated by `wgsim`. This is not a pipeline error — wgsim places variants randomly with no biological model. Run with real GIAB reads to get a biologically valid Ts/Tv ratio.
 
 ---
 
 ## Status
 
 - [x] Short-read pipeline (bwa-mem2 + DeepVariant WGS)
-- [ ] Multi-sample support
+- [x] Multi-sample support — N samples run in parallel, one VCF each
 - [ ] Long-read support (Clair3)
 - [ ] VCF normalization and annotation (VEP)
 - [ ] Beacon v2 output
 
+---
+
 ## Validation
 
-Designed for [GIAB](https://www.nist.gov/programs-projects/genome-bottle) sample NA12878 (HG001) on GRCh38.
-Truth VCF: `https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/NA12878_HG001/NISTv3.3.2/GRCh38/`
+Tested with synthetic chr20 reads generated by `wgsim` from GRCh38 chr20 (UCSC hg38).
+Two samples (HG001/HG002) with different random seeds confirmed independent variant sets.
+
+For biological validation, use [GIAB](https://www.nist.gov/programs-projects/genome-bottle) truth sets:
+- HG001 (NA12878): `https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/NA12878_HG001/NISTv3.3.2/GRCh38/`
+- HG002 (NA24385): `https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG002_NA24385_son/NISTv3.3.2/GRCh38/`
