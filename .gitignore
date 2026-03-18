@@ -1,0 +1,19 @@
+# Nextflow
+work/
+.nextflow/
+.nextflow.log*
+
+# Data
+data/reference/
+data/samples/
+data/outputs/
+*.fastq.gz
+*.bam
+*.bai
+*.vcf.gz
+*.fa
+*.fai
+*.sam
+
+# Logs
+*.log
