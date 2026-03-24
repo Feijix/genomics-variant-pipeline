@@ -330,4 +330,5 @@ Synthetic data is appropriate for validating pipeline correctness (processes com
 | 1 | Synthetic chr20, 1 sample | N/A (0 variants) | 0 | ✓ Pipeline mechanics validated |
 | 2 | Synthetic chr20, 2 samples | 0.50 (expected) | ~47,000 per sample | ✓ Multi-sample validated |
 | 3 | Synthetic chr20, short + long | 0.50 (short), 0.00 (long) | ~47,000 (short), 0 (long) | ✓ Multi-technology validated |
-| 4 | GIAB HG001, GRCh38 chr20 | ~2.0–2.1 (target) | ~68,000 (chr20) | In progress |
+| 4a | GIAB HG001, GRCh38 chr20, 3.66× | 2.17 ✓ | 54,089 | ✓ Annotation and normalisation validated; SNP recall 51.9% (coverage-limited — see §12) |
+| 4b | GIAB HG001, GRCh38 chr20, 36.3× (NYGC) | 2.175 ✓ | 78,973 | ✓ SNP recall 98.95%, precision 99.97%; indel recall 98.97%, precision 99.82% |

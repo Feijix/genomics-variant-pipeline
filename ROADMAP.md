@@ -18,8 +18,11 @@
 - Conditional workflow routing (short vs long)
 - Test on publicly available HiFi chr20 data
 
-## Stage 4 — Whole genome + Beacon v2
-- Scale to full GRCh38 (all chromosomes)
-- bcftools norm on both VCFs (left-align indels, split multiallelics)
-- VEP annotation (gene + consequence)
-- Beacon v2 `genomicVariations` output
+## Stage 4 — Real data validation + Beacon v2
+- [x] Download real GIAB HG001 reads (NYGC 30× GRCh38 CRAM, ENA ERR3239334)
+- [x] VCF normalisation with `bcftools norm`
+- [x] VEP annotation (gene + consequence + gnomAD frequencies)
+- [x] Benchmarking with `hap.py` v0.3.12 (vcfeval engine)
+- [x] Low-coverage run (3.66×): Ts/Tv 2.17 ✓, SNP recall 51.9% (coverage-limited, documented)
+- [ ] 30× run in progress — SNP recall target > 99%
+- [ ] Beacon v2 `genomicVariations` output
