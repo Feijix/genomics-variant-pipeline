@@ -1,4 +1,2 @@
-sample,fastq_1,fastq_2,sequencing_type
-HG001,data/samples/HG001_R1.fastq.gz,data/samples/HG001_R2.fastq.gz,short
-HG002,data/samples/HG002_R1.fastq.gz,data/samples/HG002_R2.fastq.gz,short
-HG003,data/samples/HG003_ONT.fastq.gz,,long
+sample,fastq_1,fastq_2,sequencing_type,truth_vcf
+HG001_real,data/giab/HG001_real_R1.fastq.gz,data/giab/HG001_real_R2.fastq.gz,short,data/giab/HG001_GRCh38_1_22_v4.2.1_benchmark.vcf.gz

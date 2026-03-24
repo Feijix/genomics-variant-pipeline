@@ -4,16 +4,19 @@ nextflow.enable.dsl=2
 
 // ── Parameters ────────────────────────────────────────────────────────────────
 params.samplesheet = 'data/samplesheet.csv'
-params.reference   = 'data/reference/chr20.fa'
+params.reference   = 'data/reference/GRCh38.fa'
 params.outdir      = 'data/outputs'
+params.vep_cache   = "$HOME/vep_data"
+params.truth_bed   = 'data/giab/HG001_GRCh38_1_22_v4.2.1_benchmark.bed'
 
 // ── Load Samples ──────────────────────────────────────────────────────────────
 Channel
     .fromPath(params.samplesheet)
     .splitCsv(header: true)
     .map { row ->
-        def fastq_2 = row.fastq_2 ? file(row.fastq_2) : []
-        tuple(row.sample, row.sequencing_type, [file(row.fastq_1), fastq_2])
+        def fastq_2  = row.fastq_2  ? file(row.fastq_2)  : []
+        def truth_vcf = row.truth_vcf ? file(row.truth_vcf) : []
+        tuple(row.sample, row.sequencing_type, [file(row.fastq_1), fastq_2], truth_vcf)
     }
     .branch {
         shortread: it[1] == 'short'
@@ -28,7 +31,7 @@ workflow {
 
     // ── Short-read path
     align(
-        branched.shortread.map { sample, type, reads -> tuple(sample, reads) },
+        branched.shortread.map { sample, type, reads, truth -> tuple(sample, reads) },
         file(params.reference),
         indexReference.out.index
     )
@@ -37,16 +40,36 @@ workflow {
 
     // ── Long-read path
     alignLongRead(
-        branched.longread.map { sample, type, reads -> tuple(sample, reads[0]) },
+        branched.longread.map { sample, type, reads, truth -> tuple(sample, reads[0]) },
         file(params.reference)
     )
     sortBamLong(alignLongRead.out)
     callVariantsLong(sortBamLong.out, file(params.reference), faiReference.out.fai)
 
-    // ── Converge both paths at QC
+    // ── Shared QC
     vcfQc(
         callVariants.out.mix(callVariantsLong.out)
     )
+
+    // ── Normalise all samples
+    normaliseVcf(vcfQc.out.vcf, file(params.reference))
+
+    // ── Annotate all samples
+    annotateVcf(normaliseVcf.out.vcf, file(params.reference), faiReference.out.fai)
+
+    // ── Benchmark only samples with a truth VCF defined
+    normaliseVcf.out.vcf
+        .join(
+            branched.shortread
+                .map { sample, type, reads, truth -> 
+                    tuple(sample, truth, file(truth.toString() + ".tbi"))
+                }
+        )
+        .filter { sample, vcf, truth, truth_tbi -> truth != [] }
+        .view { "DEBUG benchmark input: $it" }
+        .set { benchmark_input }
+
+    benchmark(benchmark_input, file(params.reference), faiReference.out.fai, file(params.truth_bed))
 }
 
 // ── Reference Indexing ────────────────────────────────────────────────────────
@@ -93,6 +116,7 @@ process align {
     container 'dceoy/bwa-mem2:latest'
     containerOptions '--entrypoint='
     publishDir "${params.outdir}/bam", mode: 'copy'
+    memory '32 GB'
 
     input:
     tuple val(sample_id), path(reads)
@@ -125,9 +149,6 @@ process alignLongRead {
     tuple val(sample_id), path("${sample_id}.sam"), emit: out
 
     script:
-    // map-ont preset applies the Oxford Nanopore error model
-    // -a outputs SAM format (minimap2 defaults to PAF)
-    // @RG tag same convention as short-read for consistency downstream
     """
     minimap2 -ax map-ont -t ${task.cpus} \
       -R "@RG\\tID:${sample_id}\\tSM:${sample_id}\\tPL:ONT" \
@@ -135,7 +156,7 @@ process alignLongRead {
     """
 }
 
-// ── BAM Processing (shared by both paths) ────────────────────────────────────
+// ── BAM Processing ────────────────────────────────────────────────────────────
 
 process sortBam {
     tag "${sample_id}"
@@ -173,7 +194,7 @@ process sortBamLong {
     """
 }
 
-// ── Short-read Variant Calling ────────────────────────────────────────────────
+// ── Variant Calling ───────────────────────────────────────────────────────────
 
 process callVariants {
     tag "${sample_id}"
@@ -200,13 +221,12 @@ process callVariants {
       --reads=${bam_file} \
       --output_vcf=output/${sample_id}.vcf.gz \
       --num_shards=${task.cpus} \
-      --sample_name=${sample_id}
+      --sample_name=${sample_id} \
+      --regions=chr20
 
     mv output/${sample_id}.vcf.gz ${sample_id}.vcf.gz
     """
 }
-
-// ── Long-read Variant Calling ─────────────────────────────────────────────────
 
 process callVariantsLong {
     tag "${sample_id}"
@@ -224,9 +244,6 @@ process callVariantsLong {
     tuple val(sample_id), path("${sample_id}.vcf.gz"), emit: out
 
     script:
-    // Clair3 requires absolute paths — $PWD resolves this inside the work dir
-    // ont is the model for Oxford Nanopore reads
-    // --include_all_ctgs calls variants on all contigs, not just chr1-22/X/Y
     """
     /opt/bin/run_clair3.sh \
       --bam_fn=${bam_file} \
@@ -242,7 +259,7 @@ process callVariantsLong {
     """
 }
 
-// ── VCF QC & Filtering (shared by both paths) ─────────────────────────────────
+// ── VCF QC & Filtering ────────────────────────────────────────────────────────
 
 process vcfQc {
     tag "${sample_id}"
@@ -253,12 +270,118 @@ process vcfQc {
     tuple val(sample_id), path(vcf_file)
 
     output:
-    path("${sample_id}.final.vcf.gz"), emit: vcf
-    path("${sample_id}.stats.txt"),    emit: stats
+    tuple val(sample_id), path("${sample_id}.final.vcf.gz"), emit: vcf
+    path("${sample_id}.stats.txt"),                          emit: stats
 
     script:
     """
     bcftools view -i 'QUAL>20' ${vcf_file} -Oz -o ${sample_id}.final.vcf.gz
     bcftools stats ${sample_id}.final.vcf.gz > ${sample_id}.stats.txt
+    """
+}
+
+// ── VCF Normalisation ─────────────────────────────────────────────────────────
+
+process normaliseVcf {
+    tag "${sample_id}"
+    container 'staphb/bcftools:latest'
+    publishDir "${params.outdir}/normalised", mode: 'copy'
+
+    input:
+    tuple val(sample_id), path(vcf_file)
+    path(reference)
+
+    output:
+    tuple val(sample_id), path("${sample_id}.normalised.vcf.gz"),     emit: vcf
+    tuple val(sample_id), path("${sample_id}.normalised.vcf.gz.tbi"), emit: tbi
+
+    script:
+    """
+    bcftools norm \
+      -f ${reference} \
+      -m -any \
+      ${vcf_file} \
+      -Oz -o ${sample_id}.normalised.vcf.gz
+
+    bcftools index -t ${sample_id}.normalised.vcf.gz
+    """
+}
+
+// ── VCF Annotation — VEP ─────────────────────────────────────────────────────
+
+process annotateVcf {
+    tag "${sample_id}"
+    container 'ensemblorg/ensembl-vep:latest'
+    containerOptions "-v ${params.vep_cache}:/opt/vep/.vep"
+    publishDir "${params.outdir}/annotated", mode: 'copy'
+    cpus 4
+    memory '16 GB'
+
+    input:
+    tuple val(sample_id), path(vcf_file)
+    path(reference)
+    path(fai)
+
+    output:
+    tuple val(sample_id), path("${sample_id}.annotated.vcf.gz"),     emit: vcf
+    tuple val(sample_id), path("${sample_id}.annotated.vcf.gz.tbi"), emit: tbi
+    path("${sample_id}.vep_summary.html"),                            emit: summary
+
+    script:
+    """
+    vep \
+      --input_file ${vcf_file} \
+      --output_file ${sample_id}.annotated.vcf \
+      --format vcf \
+      --vcf \
+      --offline \
+      --fasta ${reference} \
+      --species homo_sapiens \
+      --assembly GRCh38 \
+      --cache \
+      --dir_cache /opt/vep/.vep \
+      --fork ${task.cpus} \
+      --everything \
+      --force_overwrite \
+      --stats_file ${sample_id}.vep_summary.html
+    
+    bgzip ${sample_id}.annotated.vcf
+    tabix -p vcf ${sample_id}.annotated.vcf.gz
+    """
+}
+
+// ── Benchmarking — hap.py ────────────────────────────────────────────────────
+
+process benchmark {
+    tag "${sample_id}"
+    container 'jmcdani20/hap.py:v0.3.12'
+    publishDir "${params.outdir}/benchmark", mode: 'copy'
+    cpus 4
+    memory '16 GB'
+
+    input:
+    tuple val(sample_id), path(vcf_file), path(truth_vcf), path(truth_tbi)
+    path(reference)
+    path(fai)
+    path(truth_bed)
+
+    output:
+    path("${sample_id}.benchmark.summary.csv"), emit: summary
+    path("${sample_id}.benchmark.metrics.json.gz"), emit: metrics
+    path("${sample_id}.benchmark.extended.csv"),    emit: extended
+
+    script:
+    """
+    echo -e "chr20\t0\t64444167" > chr20.bed
+
+    /opt/hap.py/bin/hap.py \
+      ${truth_vcf} \
+      ${vcf_file} \
+      -r ${reference} \
+      -f ${truth_bed} \
+      -o ${sample_id}.benchmark \
+      -T chr20.bed \
+      --threads ${task.cpus} \
+      --engine=vcfeval
     """
 }
