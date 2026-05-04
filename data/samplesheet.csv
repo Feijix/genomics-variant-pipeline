@@ -1,2 +1,3 @@
-sample,fastq_1,fastq_2,sequencing_type,truth_vcf
-HG001_real,data/giab/HG001_real_R1.fastq.gz,data/giab/HG001_real_R2.fastq.gz,short,data/giab/HG001_GRCh38_1_22_v4.2.1_benchmark.vcf.gz
+sample,sequencing_type,fastq_1,fastq_2,truth_vcf,truth_bed
+HG002_ONT_R10,longread,data/samples/HG002_ONT_R10_chr20.fastq.gz,,data/giab/HG002/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz,data/giab/HG002/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed
+HG001,shortread,data/giab/HG001_real_R1.fastq.gz,data/giab/HG001_real_R2.fastq.gz,data/giab/HG001_GRCh38_1_22_v4.2.1_benchmark.vcf.gz,data/giab/HG001_GRCh38_1_22_v4.2.1_benchmark.bed

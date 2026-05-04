@@ -7,7 +7,6 @@ params.samplesheet = 'data/samplesheet.csv'
 params.reference   = 'data/reference/GRCh38.fa'
 params.outdir      = 'data/outputs'
 params.vep_cache   = "$HOME/vep_data"
-params.truth_bed   = 'data/giab/HG001_GRCh38_1_22_v4.2.1_benchmark.bed'
 
 // ── Load Samples ──────────────────────────────────────────────────────────────
 Channel
@@ -16,11 +15,12 @@ Channel
     .map { row ->
         def fastq_2  = row.fastq_2  ? file(row.fastq_2)  : []
         def truth_vcf = row.truth_vcf ? file(row.truth_vcf) : []
-        tuple(row.sample, row.sequencing_type, [file(row.fastq_1), fastq_2], truth_vcf)
+        def truth_bed = row.truth_bed ? file(row.truth_bed) : []
+        tuple(row.sample, row.sequencing_type, [file(row.fastq_1), fastq_2], truth_vcf, truth_bed)
     }
     .branch {
-        shortread: it[1] == 'short'
-        longread:  it[1] == 'long'
+        shortread: it[1] == 'shortread'
+        longread:  it[1] == 'longread'
     }
     .set { branched }
 
@@ -31,7 +31,7 @@ workflow {
 
     // ── Short-read path
     align(
-        branched.shortread.map { sample, type, reads, truth -> tuple(sample, reads) },
+        branched.shortread.map { sample, type, reads, truth_vcf, truth_bed -> tuple(sample, reads) },
         file(params.reference),
         indexReference.out.index
     )
@@ -40,7 +40,7 @@ workflow {
 
     // ── Long-read path
     alignLongRead(
-        branched.longread.map { sample, type, reads, truth -> tuple(sample, reads[0]) },
+        branched.longread.map { sample, type, reads, truth_vcf, truth_bed -> tuple(sample, reads[0]) },
         file(params.reference)
     )
     sortBamLong(alignLongRead.out)
@@ -58,18 +58,21 @@ workflow {
     annotateVcf(normaliseVcf.out.vcf, file(params.reference), faiReference.out.fai)
 
     // ── Benchmark only samples with a truth VCF defined
+    branched.shortread
+        .mix(branched.longread)
+        .map { sample, type, reads, truth_vcf, truth_bed ->
+            tuple(sample, truth_vcf, file(truth_vcf.toString() + ".tbi"), truth_bed)
+        }
+        .set { truth_ch }
+
     normaliseVcf.out.vcf
-        .join(
-            branched.shortread
-                .map { sample, type, reads, truth -> 
-                    tuple(sample, truth, file(truth.toString() + ".tbi"))
-                }
-        )
-        .filter { sample, vcf, truth, truth_tbi -> truth != [] }
+        .join(truth_ch)
+        .filter { sample, vcf, truth_vcf, truth_tbi, truth_bed -> 
+            truth_vcf != [] && truth_bed != [] }
         .view { "DEBUG benchmark input: $it" }
         .set { benchmark_input }
 
-    benchmark(benchmark_input, file(params.reference), faiReference.out.fai, file(params.truth_bed))
+    benchmark(benchmark_input, file(params.reference), faiReference.out.fai)
 }
 
 // ── Reference Indexing ────────────────────────────────────────────────────────
@@ -250,10 +253,10 @@ process callVariantsLong {
       --ref_fn=${reference} \
       --threads=${task.cpus} \
       --platform=ont \
-      --model_path=/opt/models/ont \
+      --model_path=/opt/models/r1041_e82_400bps_sup_v500 \
       --output=\$PWD/clair3_output \
       --sample_name=${sample_id} \
-      --include_all_ctgs
+      --ctg_name=chr20
 
     mv clair3_output/merge_output.vcf.gz ${sample_id}.vcf.gz
     """
@@ -275,7 +278,7 @@ process vcfQc {
 
     script:
     """
-    bcftools view -i 'QUAL>20' ${vcf_file} -Oz -o ${sample_id}.final.vcf.gz
+    bcftools view -f PASS ${vcf_file} -Oz -o ${sample_id}.final.vcf.gz
     bcftools stats ${sample_id}.final.vcf.gz > ${sample_id}.stats.txt
     """
 }
@@ -360,10 +363,9 @@ process benchmark {
     memory '16 GB'
 
     input:
-    tuple val(sample_id), path(vcf_file), path(truth_vcf), path(truth_tbi)
+    tuple val(sample_id), path(vcf_file), path(truth_vcf), path(truth_tbi), path(truth_bed)
     path(reference)
     path(fai)
-    path(truth_bed)
 
     output:
     path("${sample_id}.benchmark.summary.csv"), emit: summary
