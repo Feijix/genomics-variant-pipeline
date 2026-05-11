@@ -1,3 +1,6 @@
-sample,sequencing_type,fastq_1,fastq_2,truth_vcf,truth_bed
-HG002_ONT_R10,longread,data/samples/HG002_ONT_R10_chr20.fastq.gz,,data/giab/HG002/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz,data/giab/HG002/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed
-HG001,shortread,data/giab/HG001_real_R1.fastq.gz,data/giab/HG001_real_R2.fastq.gz,data/giab/HG001_GRCh38_1_22_v4.2.1_benchmark.vcf.gz,data/giab/HG001_GRCh38_1_22_v4.2.1_benchmark.bed
+sample,sequencing_type,fastq_1,fastq_2,aligned_bam,truth_vcf,truth_bed,clair3_platform,clair3_model,dv_model
+HG001,shortread,data/giab/HG001_real_R1.fastq.gz,data/giab/HG001_real_R2.fastq.gz,,data/giab/HG001_GRCh38_1_22_v4.2.1_benchmark.vcf.gz,data/giab/HG001_GRCh38_1_22_v4.2.1_benchmark.bed,,,WGS
+HG002_ONT,longread,data/samples/HG002_ONT_chr20.fastq.gz,,,data/giab/HG002/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz,data/giab/HG002/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed,ont,r941_prom_hac_g360+g422,
+HG002_ONT_giab,longread,data/samples/HG002_ONT_giab_chr20.fastq.gz,,,data/giab/HG002/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz,data/giab/HG002/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed,ont,r941_prom_hac_g360+g422,
+HG002_ONT_R10,longread,data/samples/HG002_ONT_R10_chr20.fastq.gz,,,data/giab/HG002/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz,data/giab/HG002/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed,ont,r1041_e82_400bps_sup_v500,ONT_R104
+HG002_HiFi,longread,,,data/samples/HG002_HiFi_chr20.bam,data/giab/HG002/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz,data/giab/HG002/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed,hifi,hifi_revio,PACBIO
