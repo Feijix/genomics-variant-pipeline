@@ -1,0 +1,34 @@
+process {
+    errorStrategy = 'retry'
+    maxRetries = 1
+    cpus = 4
+    memory = '8 GB'
+    withName: 'align' {
+        memory = '32 GB'
+        maxForks = 1
+    }
+    withName: 'alignLongRead' {
+        memory = '24 GB'
+        maxForks = 1
+    }
+    withName: 'callVariants|callVariantsLongDV' {
+        maxForks = 2
+    }
+}
+
+docker {
+    enabled = true
+    runOptions = '-u $(id -u):$(id -g)'
+    mountFlags = 'z'
+}
+
+profiles {
+    docker {
+        docker.enabled = true
+    }
+}
+
+executor {
+    cpus = 16
+    memory = '32 GB'
+}
