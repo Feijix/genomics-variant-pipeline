@@ -1,7 +1,7 @@
 process callVariantsLong {
     tag "${sample_id} (${clair3_platform}/${clair3_model})"
     container 'hkubal/clair3:latest'
-    publishDir "${params.outdir}/vcf/${sample_id}_clair3", mode: 'copy'
+    publishDir path: { "${params.outdir}/vcf/${sample_id}_clair3" }, mode: 'copy'
     cpus 4
     memory '8 GB'
 

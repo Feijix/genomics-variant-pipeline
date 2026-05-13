@@ -2,7 +2,7 @@ process annotateVcf {
     tag "${sample_id}/${caller}"
     container 'ensemblorg/ensembl-vep:latest'
     containerOptions "-v ${params.vep_cache}:/opt/vep/.vep"
-    publishDir "${params.outdir}/annotated/${caller}", mode: 'copy'
+    publishDir path: { "${params.outdir}/annotated/${caller}" }, mode: 'copy'
     cpus 4
     memory '16 GB'
 

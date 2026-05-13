@@ -1,7 +1,7 @@
 process ensembleMergeLong {
     tag "${sample_id}"
     container 'staphb/bcftools:latest'
-    publishDir "${params.outdir}/vcf/${sample_id}_ensemble", mode: 'copy'
+    publishDir path: { "${params.outdir}/vcf/${sample_id}_ensemble" }, mode: 'copy'
 
     input:
     tuple val(sample_id), path(clair3_vcf), path(dv_vcf)

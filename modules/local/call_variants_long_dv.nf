@@ -1,7 +1,7 @@
 process callVariantsLongDV {
     tag "${sample_id} (${dv_model})"
     container 'google/deepvariant:1.10.0'
-    publishDir "${params.outdir}/vcf/${sample_id}_deepvariant_long", mode: 'copy'
+    publishDir path: { "${params.outdir}/vcf/${sample_id}_deepvariant_long" }, mode: 'copy'
     cpus 4
     memory '32 GB'
 

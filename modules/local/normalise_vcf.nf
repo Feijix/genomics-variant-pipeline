@@ -1,7 +1,7 @@
 process normaliseVcf {
     tag "${sample_id}/${caller}"
     container 'staphb/bcftools:latest'
-    publishDir "${params.outdir}/normalised/${caller}", mode: 'copy'
+    publishDir path: { "${params.outdir}/normalised/${caller}" }, mode: 'copy'
 
     input:
     tuple val(sample_id), val(caller), path(vcf_file)

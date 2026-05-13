@@ -1,7 +1,7 @@
 process benchmark {
     tag "${sample_id}/${caller}"
     container 'jmcdani20/hap.py:v0.3.12'
-    publishDir "${params.outdir}/benchmark/${caller}", mode: 'copy'
+    publishDir path: { "${params.outdir}/benchmark/${caller}" }, mode: 'copy'
     cpus 4
     memory '16 GB'
 

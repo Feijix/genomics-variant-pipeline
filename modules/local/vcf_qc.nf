@@ -1,7 +1,7 @@
 process vcfQc {
     tag "${sample_id}/${caller}"
     container 'staphb/bcftools:latest'
-    publishDir "${params.outdir}/qc/${caller}", mode: 'copy'
+    publishDir path: { "${params.outdir}/qc/${caller}" }, mode: 'copy'
 
     input:
     tuple val(sample_id), val(caller), path(vcf_file)
