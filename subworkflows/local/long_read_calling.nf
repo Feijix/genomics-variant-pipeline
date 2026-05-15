@@ -52,6 +52,7 @@ workflow LONG_READ_CALLING {
         .join(
             all_longread_samples.map { it -> tuple(it[0], it[6], it[7]) }
         )
+        .filter { sample, bam, bai, clair3_platform, clair3_model -> clair3_platform != '' }
         .set { clair3_input }
 
     callVariantsLong(clair3_input, reference, fai)

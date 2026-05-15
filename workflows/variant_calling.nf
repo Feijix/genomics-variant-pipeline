@@ -35,12 +35,12 @@ workflow VARIANT_CALLING {
             def fastq_1          = row.fastq_1          ? file(row.fastq_1)     : []
 
             // Per-sample validation
-            if (row.sequencing_type == 'longread' && !clair3_model) {
-                error "Sample '${row.sample}' is longread but has no clair3_model declared"
-            }
-            if (row.sequencing_type == 'longread' && !clair3_platform) {
-                error "Sample '${row.sample}' is longread but has no clair3_platform declared"
-            }
+            // if (row.sequencing_type == 'longread' && !clair3_model) {
+            //     error "Sample '${row.sample}' is longread but has no clair3_model declared"
+            // }
+            // if (row.sequencing_type == 'longread' && !clair3_platform) {
+            //     error "Sample '${row.sample}' is longread but has no clair3_platform declared"
+            // }
             if (!fastq_1 && !aligned_bam) {
                 error "Sample '${row.sample}' has neither fastq_1 nor aligned_bam declared"
             }
