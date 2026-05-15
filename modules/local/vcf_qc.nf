@@ -1,18 +1,17 @@
 process vcfQc {
-    tag "${sample_id}/${caller}"
+    tag "${meta.id}/${meta.caller}"
     container 'staphb/bcftools:latest'
-    publishDir path: { "${params.outdir}/qc/${caller}" }, mode: 'copy'
 
     input:
-    tuple val(sample_id), val(caller), path(vcf_file)
+    tuple val(meta), path(vcf_file)
 
     output:
-    tuple val(sample_id), val(caller), path("${sample_id}.${caller}.final.vcf.gz"), emit: vcf
-    path("${sample_id}.${caller}.stats.txt"), emit: stats
+    tuple val(meta), path("${meta.id}.${meta.caller}.final.vcf.gz"), emit: vcf
+    path("${meta.id}.${meta.caller}.stats.txt"),                     emit: stats
 
     script:
     """
-    bcftools view -f PASS ${vcf_file} -Oz -o ${sample_id}.${caller}.final.vcf.gz
-    bcftools stats ${sample_id}.${caller}.final.vcf.gz > ${sample_id}.${caller}.stats.txt
+    bcftools view -f PASS ${vcf_file} -Oz -o ${meta.id}.${meta.caller}.final.vcf.gz
+    bcftools stats ${meta.id}.${meta.caller}.final.vcf.gz > ${meta.id}.${meta.caller}.stats.txt
     """
 }

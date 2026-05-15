@@ -1,14 +1,13 @@
 process ensembleUnionLong {
-    tag "${sample_id}"
+    tag "${meta.id}"
     container 'staphb/bcftools:latest'
-    publishDir path: { "${params.outdir}/vcf/${sample_id}_ensemble_union" }, mode: 'copy'
 
     input:
-    tuple val(sample_id), path(clair3_vcf), path(dv_vcf)
+    tuple val(meta), path(clair3_vcf), path(dv_vcf)
     path(reference)
 
     output:
-    tuple val(sample_id), path("${sample_id}.ensemble_union.vcf.gz"), emit: vcf
+    tuple val(meta), path("${meta.id}.ensemble_union.vcf.gz"), emit: vcf
 
     script:
     """
@@ -19,7 +18,7 @@ process ensembleUnionLong {
 
     bcftools concat -a clair3.norm.vcf.gz dv.norm.vcf.gz -Oz -o concat.vcf.gz
     bcftools sort concat.vcf.gz -Oz -o sorted.vcf.gz
-    bcftools norm -d exact sorted.vcf.gz -Oz -o ${sample_id}.ensemble_union.vcf.gz
-    bcftools index -t ${sample_id}.ensemble_union.vcf.gz
+    bcftools norm -d exact sorted.vcf.gz -Oz -o ${meta.id}.ensemble_union.vcf.gz
+    bcftools index -t ${meta.id}.ensemble_union.vcf.gz
     """
 }
