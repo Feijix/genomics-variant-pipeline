@@ -1,23 +1,24 @@
 /*
  * subworkflows/local/long_read_calling.nf
  *
- * Long-read variant calling path. Accepts both FASTQ-input and pre-aligned-BAM
- * input samples; converges them via mix() after alignment/indexing; then runs:
- *   - Clair3 on samples that declare clair3_platform
+ * Long-read variant calling path. Accepts FASTQ input (aligned via minimap2)
+ * and pre-aligned BAM input (indexed). Converges via mix() then runs:
+ *   - Clair3 on samples that declare clair3_platform + clair3_model
  *   - DeepVariant on samples that declare dv_model
- *   - Ensemble merge (intersect) and union on samples that ran both
+ *   - Ensemble intersect (BCFTOOLS_ISEC) and union (BCFTOOLS_CONCAT) on samples
+ *     that produced both Clair3 and DeepVariant outputs
  *
- * Caller tagging happens at the subworkflow boundary — each emitted channel
- * has meta.caller set so downstream postprocess is uniform.
+ * Caller tagging happens at the subworkflow boundary so downstream postprocess
+ * sees a uniform (meta+caller, vcf) channel shape.
  */
 
-include { alignLongRead     } from '../../modules/local/align_long_read.nf'
-include { sortBam           } from '../../modules/local/sort_bam.nf'
-include { indexAlignedBam   } from '../../modules/local/index_aligned_bam.nf'
-include { callVariantsLong  } from '../../modules/local/call_variants_long.nf'
-include { deepvariant       } from '../../modules/local/deepvariant.nf'
-include { ensembleMergeLong } from '../../modules/local/ensemble_merge_long.nf'
-include { ensembleUnionLong } from '../../modules/local/ensemble_union_long.nf'
+include { MINIMAP2_ALIGN  } from '../../modules/local/minimap2_align.nf'
+include { SAMTOOLS_SORT   } from '../../modules/local/samtools_sort.nf'
+include { SAMTOOLS_INDEX  } from '../../modules/local/samtools_index.nf'
+include { CLAIR3          } from '../../modules/local/clair3.nf'
+include { DEEPVARIANT     } from '../../modules/local/deepvariant.nf'
+include { BCFTOOLS_ISEC   } from '../../modules/local/bcftools_isec.nf'
+include { BCFTOOLS_CONCAT } from '../../modules/local/bcftools_concat.nf'
 
 workflow LONG_READ_CALLING {
     take:
@@ -28,56 +29,56 @@ workflow LONG_READ_CALLING {
 
     main:
     // ── Bring both input flavours up to (meta, bam, bai) ──
-    alignLongRead(
+    MINIMAP2_ALIGN(
         longread_fq_samples.map { meta, reads, _bam, _vcf, _bed -> tuple(meta, reads[0]) },
         reference
     )
-    sortBam(alignLongRead.out)
+    SAMTOOLS_SORT(MINIMAP2_ALIGN.out.out)
 
-    indexAlignedBam(
+    SAMTOOLS_INDEX(
         longread_bam_samples.map { meta, _reads, bam, _vcf, _bed -> tuple(meta, bam) }
     )
 
-    sortBam.out
-        .mix(indexAlignedBam.out)
+    SAMTOOLS_SORT.out.out
+        .mix(SAMTOOLS_INDEX.out.out)
         .set { longread_bams }
 
-    // ── Clair3 on samples that declare a platform/model ──
+    // ── Clair3 on samples that declare platform/model ──
     longread_bams
         .filter { meta, _bam, _bai -> meta.clair3_platform != '' && meta.clair3_model != '' }
         .set { clair3_input }
 
-    callVariantsLong(clair3_input, reference, fai)
+    CLAIR3(clair3_input, reference, fai)
 
     // ── DeepVariant on samples that declare a dv_model ──
     longread_bams
         .filter { meta, _bam, _bai -> meta.dv_model != '' }
         .set { dv_input }
 
-    deepvariant(dv_input, reference, fai)
+    DEEPVARIANT(dv_input, reference, fai)
 
-    // ── Ensemble: only samples that produced both Clair3 and DV outputs ──
-    callVariantsLong.out
-        .join(deepvariant.out)
+    // ── Ensemble: samples that have both Clair3 and DV outputs ──
+    CLAIR3.out.out
+        .join(DEEPVARIANT.out.out)
         .set { ensemble_input }
 
-    ensembleMergeLong(ensemble_input)
-    ensembleUnionLong(ensemble_input, reference)
+    BCFTOOLS_ISEC(ensemble_input)
+    BCFTOOLS_CONCAT(ensemble_input, reference)
 
     // ── Tag each caller's output for downstream uniformity ──
-    callVariantsLong.out
+    CLAIR3.out.out
         .map { meta, vcf -> tuple(meta + [caller: 'clair3'], vcf) }
         .set { tagged_clair3 }
 
-    deepvariant.out
+    DEEPVARIANT.out.out
         .map { meta, vcf -> tuple(meta + [caller: 'deepvariant_long'], vcf) }
         .set { tagged_dv_long }
 
-    ensembleMergeLong.out.vcf
+    BCFTOOLS_ISEC.out.vcf
         .map { meta, vcf -> tuple(meta + [caller: 'ensemble'], vcf) }
         .set { tagged_ensemble }
 
-    ensembleUnionLong.out.vcf
+    BCFTOOLS_CONCAT.out.vcf
         .map { meta, vcf -> tuple(meta + [caller: 'ensemble_union'], vcf) }
         .set { tagged_ensemble_union }
 

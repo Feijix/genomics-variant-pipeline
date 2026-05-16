@@ -1,4 +1,4 @@
-process deepvariant {
+process DEEPVARIANT {
     tag "${meta.id} (${meta.dv_model})"
     container 'google/deepvariant:1.10.0'
     cpus 4

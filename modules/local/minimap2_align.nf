@@ -1,4 +1,4 @@
-process alignLongRead {
+process MINIMAP2_ALIGN {
     tag "${meta.id}"
     container 'staphb/minimap2:latest'
 

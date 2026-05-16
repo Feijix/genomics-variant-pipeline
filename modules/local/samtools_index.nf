@@ -1,4 +1,4 @@
-process indexAlignedBam {
+process SAMTOOLS_INDEX {
     tag "${meta.id}"
     container 'staphb/samtools:latest'
 

@@ -1,4 +1,4 @@
-process vcfQc {
+process BCFTOOLS_VIEW {
     tag "${meta.id}/${meta.caller}"
     container 'staphb/bcftools:latest'
 

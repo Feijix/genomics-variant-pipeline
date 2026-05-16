@@ -2,13 +2,13 @@
  * workflows/variant_calling.nf
  *
  * Main orchestration. Loads the samplesheet, builds a meta map per row,
- * branches by sequencing technology and input flavour, dispatches each branch
- * to the appropriate calling subworkflow, and feeds the unified tagged stream
- * into postprocessing.
+ * branches by sequencing technology and input flavour, dispatches to the
+ * appropriate calling subworkflow, and feeds the unified tagged stream into
+ * postprocessing.
  */
 
-include { indexReference     } from '../modules/local/index_reference.nf'
-include { faiReference       } from '../modules/local/fai_reference.nf'
+include { BWA_MEM_INDEX      } from '../modules/local/bwa_mem_index.nf'
+include { SAMTOOLS_FAIDX     } from '../modules/local/samtools_faidx.nf'
 
 include { SHORT_READ_CALLING } from '../subworkflows/local/short_read_calling.nf'
 include { LONG_READ_CALLING  } from '../subworkflows/local/long_read_calling.nf'
@@ -17,10 +17,10 @@ include { VCF_POSTPROCESS    } from '../subworkflows/local/vcf_postprocess.nf'
 workflow VARIANT_CALLING {
 
     // ── Reference indexing ──
-    indexReference(file(params.reference))
-    faiReference(file(params.reference))
+    BWA_MEM_INDEX(file(params.reference))
+    SAMTOOLS_FAIDX(file(params.reference))
 
-    // ── Load samplesheet, build meta + paths, validate, branch ──
+    // ── Load samplesheet, build meta + paths, branch ──
     Channel
         .fromPath(params.samplesheet)
         .splitCsv(header: true)
@@ -55,18 +55,18 @@ workflow VARIANT_CALLING {
     SHORT_READ_CALLING(
         branched.shortread,
         file(params.reference),
-        indexReference.out.index,
-        faiReference.out.fai
+        BWA_MEM_INDEX.out.index,
+        SAMTOOLS_FAIDX.out.fai
     )
 
     LONG_READ_CALLING(
         branched.longread_fq,
         branched.longread_bam,
         file(params.reference),
-        faiReference.out.fai
+        SAMTOOLS_FAIDX.out.fai
     )
 
-    // ── Mix all caller outputs (already meta.caller-tagged in subworkflows) ──
+    // ── Mix all caller outputs (each subworkflow tags with meta.caller) ──
     SHORT_READ_CALLING.out.vcf
         .mix(LONG_READ_CALLING.out.clair3_vcf)
         .mix(LONG_READ_CALLING.out.dv_long_vcf)
@@ -88,6 +88,6 @@ workflow VARIANT_CALLING {
         all_vcfs,
         truth_ch,
         file(params.reference),
-        faiReference.out.fai
+        SAMTOOLS_FAIDX.out.fai
     )
 }

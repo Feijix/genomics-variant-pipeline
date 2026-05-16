@@ -1,4 +1,4 @@
-process ensembleMergeLong {
+process BCFTOOLS_ISEC {
     tag "${meta.id}"
     container 'staphb/bcftools:latest'
 

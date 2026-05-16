@@ -1,4 +1,4 @@
-process callVariantsLong {
+process CLAIR3 {
     tag "${meta.id} (${meta.clair3_platform}/${meta.clair3_model})"
     container 'hkubal/clair3:latest'
     cpus 4

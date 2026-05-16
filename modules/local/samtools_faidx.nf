@@ -1,4 +1,4 @@
-process faiReference {
+process SAMTOOLS_FAIDX {
     tag "samtools faidx"
     container 'staphb/samtools:latest'
     storeDir 'data/reference'

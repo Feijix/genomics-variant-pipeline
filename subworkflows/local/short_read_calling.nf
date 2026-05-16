@@ -2,16 +2,13 @@
  * subworkflows/local/short_read_calling.nf
  *
  * Short-read variant calling path: align → sort → DeepVariant.
- * Input is the shortread branch of the parsed samplesheet, with shape
- * (meta, [fastq_1, fastq_2], aligned_bam, truth_vcf, truth_bed).
- *
- * Output is (meta, vcf) with meta.caller set to 'deepvariant' for downstream
- * postprocessing.
+ * Input shape: (meta, [fastq_1, fastq_2], aligned_bam, truth_vcf, truth_bed).
+ * Output: (meta, vcf) with meta.caller = 'deepvariant'.
  */
 
-include { align       } from '../../modules/local/align.nf'
-include { sortBam     } from '../../modules/local/sort_bam.nf'
-include { deepvariant } from '../../modules/local/deepvariant.nf'
+include { BWA_MEM       } from '../../modules/local/bwa_mem.nf'
+include { SAMTOOLS_SORT } from '../../modules/local/samtools_sort.nf'
+include { DEEPVARIANT   } from '../../modules/local/deepvariant.nf'
 
 workflow SHORT_READ_CALLING {
     take:
@@ -21,17 +18,16 @@ workflow SHORT_READ_CALLING {
     fai
 
     main:
-    align(
+    BWA_MEM(
         shortread_samples.map { meta, reads, _bam, _vcf, _bed -> tuple(meta, reads) },
         reference,
         reference_index
     )
-    sortBam(align.out)
+    SAMTOOLS_SORT(BWA_MEM.out.out)
 
-    deepvariant(sortBam.out, reference, fai)
+    DEEPVARIANT(SAMTOOLS_SORT.out.out, reference, fai)
 
-    // Tag with caller for downstream uniformity
-    deepvariant.out
+    DEEPVARIANT.out.out
         .map { meta, vcf -> tuple(meta + [caller: 'deepvariant'], vcf) }
         .set { tagged_vcf }
 

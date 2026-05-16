@@ -1,4 +1,4 @@
-process sortBam {
+process SAMTOOLS_SORT {
     tag "${meta.id}"
     container 'staphb/samtools:latest'
 

@@ -1,4 +1,4 @@
-process benchmark {
+process HAPPY_HAPPY {
     tag "${meta.id}/${meta.caller}"
     container 'jmcdani20/hap.py:v0.3.12'
     cpus 4

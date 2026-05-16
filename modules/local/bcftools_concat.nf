@@ -1,4 +1,4 @@
-process ensembleUnionLong {
+process BCFTOOLS_CONCAT {
     tag "${meta.id}"
     container 'staphb/bcftools:latest'
 

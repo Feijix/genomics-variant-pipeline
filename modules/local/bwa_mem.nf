@@ -1,4 +1,4 @@
-process align {
+process BWA_MEM {
     tag "${meta.id}"
     container 'dceoy/bwa-mem2:latest'
     containerOptions '--entrypoint='

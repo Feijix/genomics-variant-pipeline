@@ -1,4 +1,4 @@
-process normaliseVcf {
+process BCFTOOLS_NORM {
     tag "${meta.id}/${meta.caller}"
     container 'staphb/bcftools:latest'
 

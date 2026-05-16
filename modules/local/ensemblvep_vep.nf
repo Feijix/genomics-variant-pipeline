@@ -1,4 +1,4 @@
-process annotateVcf {
+process ENSEMBLVEP_VEP {
     tag "${meta.id}/${meta.caller}"
     container 'ensemblorg/ensembl-vep:latest'
     containerOptions "-v ${params.vep_cache}:/opt/vep/.vep"

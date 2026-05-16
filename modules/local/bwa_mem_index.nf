@@ -1,4 +1,4 @@
-process indexReference {
+process BWA_MEM_INDEX {
     tag "bwa-mem2 index"
     container 'dceoy/bwa-mem2:latest'
     containerOptions '--entrypoint='
