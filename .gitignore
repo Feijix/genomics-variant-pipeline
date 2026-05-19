@@ -8,6 +8,7 @@ data/reference/
 data/samples/
 data/outputs/
 data/giab/
+data/beacon_*/
 *.fastq.gz
 *.bam
 *.bai
