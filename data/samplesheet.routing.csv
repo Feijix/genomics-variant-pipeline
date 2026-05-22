@@ -1,0 +1,5 @@
+sample,sequencing_type,platform,chemistry,basecaller,fastq_1,fastq_2,aligned_bam,truth_vcf,truth_bed,callers
+HG001,shortread,illumina,,,data/giab/HG001_real_R1.fastq.gz,data/giab/HG001_real_R2.fastq.gz,,data/giab/HG001_GRCh38_1_22_v4.2.1_benchmark.vcf.gz,data/giab/HG001_GRCh38_1_22_v4.2.1_benchmark.bed,
+HG002_ONT_giab,longread,ont,r9.4.1,guppy_hac_g360,data/samples/HG002_ONT_giab_chr20.fastq.gz,,,data/giab/HG002/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz,data/giab/HG002/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed,
+HG002_ONT_R10,longread,ont,r10.4.1,dorado_sup,data/samples/HG002_ONT_R10_chr20.fastq.gz,,,data/giab/HG002/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz,data/giab/HG002/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed,
+HG002_HiFi,longread,pacbio,hifi,,,,data/samples/HG002_HiFi_chr20.bam,data/giab/HG002/HG002_GRCh38_1_22_v4.2.1_benchmark.vcf.gz,data/giab/HG002/HG002_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed,

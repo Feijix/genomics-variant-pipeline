@@ -1,5 +1,5 @@
 process DEEPVARIANT {
-    tag "${meta.id} (${meta.dv_model})"
+    tag "${meta.id} (${meta.model_type})"
     container 'google/deepvariant:1.10.0'
     cpus 4
     memory '32 GB'
@@ -16,7 +16,7 @@ process DEEPVARIANT {
     """
     mkdir -p output
     /opt/deepvariant/bin/run_deepvariant \\
-      --model_type=${meta.dv_model} \\
+      --model_type=${meta.model_type} \\
       --ref=${reference} \\
       --reads=${bam_file} \\
       --output_vcf=output/${meta.id}.deepvariant.vcf.gz \\
