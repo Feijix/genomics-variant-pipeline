@@ -1,0 +1,40 @@
+# Pinned SURVIVOR image for the genomics-variant-pipeline.
+#
+# Reproducibility: exact version fixed. SURVIVOR 1.0.7
+# (github.com/fritzsedlazeck/SURVIVOR).
+#
+# SURVIVOR is C++; no PyPI/conda pin we control, so we build the tagged release
+# from source. Used for SV-SV ensemble merging (Sniffles2 + cuteSV) — fuzzy,
+# breakpoint-tolerant merging that bcftools (exact-match) cannot do for SVs.
+#
+# Build once on the server:
+#   docker build -t survivor:1.0.7 -f Dockerfile.survivor .
+#
+# Merge command (in the module):
+#   union (>=1 caller):     SURVIVOR merge list 1000 1 1 1 0 50 union.vcf
+#   intersect (>=2 callers): SURVIVOR merge list 1000 2 1 1 0 50 intersect.vcf
+
+FROM ubuntu:22.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        zlib1g-dev \
+        wget \
+        ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Build the pinned 1.0.7 release from source. (Tag is '1.0.7', no 'v' prefix.)
+RUN wget -q https://github.com/fritzsedlazeck/SURVIVOR/archive/refs/tags/1.0.7.tar.gz \
+        -O survivor.tar.gz \
+    && tar xzf survivor.tar.gz \
+    && cd SURVIVOR-1.0.7/Debug \
+    && make \
+    && cp SURVIVOR /usr/local/bin/SURVIVOR \
+    && cd / \
+    && rm -rf survivor.tar.gz SURVIVOR-1.0.7
+
+# Sanity check — prints version/usage (SURVIVOR exits non-zero on bare call,
+# so grep for the version string instead of relying on exit code).
+RUN SURVIVOR 2>&1 | grep -i 'Version' || true
+
+ENTRYPOINT []

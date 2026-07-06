@@ -1,0 +1,32 @@
+# Pinned cuteSV image for the genomics-variant-pipeline.
+#
+# Reproducibility: exact version fixed. cuteSV 2.1.3 (PyPI / tjiangHIT).
+# Second long-read SV caller, enabling SV-SV ensembles with Sniffles2.
+#
+# Build once on the server:
+#   docker build -t cutesv:2.1.3 -f Dockerfile.cutesv .
+#
+# cuteSV is pure-Python; its deps (scipy, pysam, Biopython, cigar, numpy,
+# pyvcf3, scikit-learn) are pulled automatically by pip.
+
+FROM python:3.10-slim
+
+# pysam needs zlib/bz2/lzma headers + a compiler for its C extensions.
+# tabix provides bgzip + tabix for compressing/indexing the output VCF.
+# samtools is used to subset the input BAM to chr20 and drop foreign decoy
+# contigs (e.g. KMT2C patches) that crash cuteSV's contig validation.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential \
+        zlib1g-dev \
+        libbz2-dev \
+        liblzma-dev \
+        tabix \
+        samtools \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir cuteSV==2.1.3
+
+# Sanity check at build time.
+RUN cuteSV --version
+
+ENTRYPOINT []

@@ -1,0 +1,20 @@
+# Pinned Sniffles2 image for the genomics-variant-pipeline.
+#
+# Reproducibility: every dependency version is fixed. Matches the official
+# Sniffles 2.8.0 release (github.com/fritzsedlazeck/Sniffles).
+#
+# Build once on the server:
+#   docker build -t sniffles:2.8.0 -f Dockerfile.sniffles .
+#
+# The pipeline references `sniffles:2.8.0` locally (no registry push needed
+# for single-host use).
+
+FROM python:3.10-slim
+
+# Sniffles is pure-Python + pysam; pin the exact release.
+RUN pip install --no-cache-dir sniffles==2.8.0
+
+# Sanity check at build time — fails the build if the binary is missing.
+RUN sniffles --version
+
+ENTRYPOINT []
