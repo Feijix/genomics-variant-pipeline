@@ -19,3 +19,13 @@ data/beacon_*/
 
 # Logs
 *.log
+# SV test/scratch data
+data/delly_excl/
+data/gridss_ref/
+data/gridss_test/
+data/smoove_test/
+data/sv_benchmark_test/
+data/sv_ensemble_*/
+data/giab_illumina/
+# Unknown root file
+/python

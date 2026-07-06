@@ -23,9 +23,18 @@ include { VCF_POSTPROCESS } from '../subworkflows/local/vcf_postprocess.nf'
 
 include { DEEPVARIANT     } from '../modules/local/deepvariant.nf'
 include { CLAIR3          } from '../modules/local/clair3.nf'
+include { SNIFFLES2       } from '../modules/local/sniffles2.nf'
+include { CUTESV          } from '../modules/local/cutesv.nf'
+include { MANTA           } from '../modules/local/manta.nf'
+include { DELLY           } from '../modules/local/delly.nf'
+include { CONVERT_DELLY   } from '../modules/local/convert_delly.nf'
+include { SMOOVE          } from '../modules/local/smoove.nf'
+include { GRIDSS          } from '../modules/local/gridss.nf'
+include { CONVERT_GRIDSS  } from '../modules/local/convert_gridss.nf'
+include { SURVIVOR        } from '../modules/local/survivor.nf'
 include { BCFTOOLS_ISEC   } from '../modules/local/bcftools_isec.nf'
 include { BCFTOOLS_CONCAT } from '../modules/local/bcftools_concat.nf'
-
+include { BEACON_SV2BFF   } from '../modules/local/beacon_sv2bff.nf'
 
 // ─── Routing helpers (inline) ────────────────────────────────────────────────
 
@@ -147,21 +156,33 @@ workflow VARIANT_CALLING {
     ALIGNMENT.out.bams
         .flatMap { meta, bam, bai ->
             meta.selected_callers.collect { caller_spec ->
-                def enriched = meta + caller_spec.params + [caller: caller_spec.tool]
+                def enriched = meta + caller_spec.params + [caller: caller_spec.tool, variant_class: caller_spec.variant_class ?: 'small']
                 tuple(enriched, bam, bai)
             }
         }
         .branch { meta, _bam, _bai ->
             deepvariant: meta.caller == 'deepvariant'
             clair3:      meta.caller == 'clair3'
+            sniffles2:   meta.caller == 'sniffles2'
+            cutesv:      meta.caller == 'cutesv'
+            manta:       meta.caller == 'manta'
+            delly:       meta.caller == 'delly'
+            smoove:      meta.caller == 'smoove'
+            gridss:      meta.caller == 'gridss'
         }
         .set { per_caller }
 
     // ── Per-caller invocations (Option A dispatch) ──
     DEEPVARIANT(per_caller.deepvariant, file(params.reference), SAMTOOLS_FAIDX.out.fai)
     CLAIR3     (per_caller.clair3,      file(params.reference), SAMTOOLS_FAIDX.out.fai)
-
-    // ── Tag each caller's output for postprocess uniformity ──
+    SNIFFLES2  (per_caller.sniffles2,   file(params.reference), SAMTOOLS_FAIDX.out.fai)
+    CUTESV     (per_caller.cutesv,      file(params.reference), SAMTOOLS_FAIDX.out.fai)
+    MANTA      (per_caller.manta,       file(params.reference_chr20), file("${params.reference_chr20}.fai"))
+    DELLY      (per_caller.delly,       file(params.reference_chr20), file("${params.reference_chr20}.fai"))
+    CONVERT_DELLY(DELLY.out.bcf.join(DELLY.out.csi))
+    SMOOVE     (per_caller.smoove, file(params.reference_chr20), file("${params.reference_chr20}.fai"))
+    GRIDSS(per_caller.gridss, file(params.reference_chr20), file("${params.reference_chr20}.fai"))
+    CONVERT_GRIDSS(GRIDSS.out.bnd, file("${params.reference_chr20}.fai"))
     DEEPVARIANT.out.out
         .map { meta, vcf -> tuple(meta + [caller: 'deepvariant'], vcf) }
         .set { tagged_dv }
@@ -169,6 +190,17 @@ workflow VARIANT_CALLING {
     CLAIR3.out.out
         .map { meta, vcf -> tuple(meta + [caller: 'clair3'], vcf) }
         .set { tagged_clair3 }
+    
+    SNIFFLES2.out.vcf
+        .map { meta, vcf -> tuple(meta + [caller: 'sniffles2'], vcf) }
+        .mix(CUTESV.out.vcf.map { meta, vcf -> tuple(meta + [caller: 'cutesv'], vcf) })
+        .mix(MANTA.out.vcf.map  { meta, vcf -> tuple(meta + [caller: 'manta'],  vcf) })
+        .mix(CONVERT_DELLY.out.vcf.map { meta, vcf -> tuple(meta + [caller: 'delly'], vcf) })
+        .mix(SMOOVE.out.vcf.map         { meta, vcf -> tuple(meta + [caller: 'smoove'], vcf) })
+        .mix(CONVERT_GRIDSS.out.vcf.map { meta, vcf -> tuple(meta + [caller: 'gridss'], vcf) })
+        .set { sv_vcfs }
+
+    
 
     tagged_dv.mix(tagged_clair3).set { primary_vcfs }
 
@@ -203,6 +235,14 @@ workflow VARIANT_CALLING {
         Channel.empty().set { tagged_concat }
     }
 
+    sv_vcfs
+    .map { meta, vcf -> tuple(meta.id, vcf) }
+    .groupTuple()                                  // [id, [vcf1, vcf2, ...]]
+    .map { id, vcfs -> tuple([id: id], vcfs) }
+    .set { sv_grouped }
+
+    SURVIVOR(sv_grouped)
+
     // ── All VCFs (primary + ensemble) into postprocess ──
     primary_vcfs
         .mix(tagged_isec)
@@ -223,4 +263,7 @@ workflow VARIANT_CALLING {
         file(params.reference),
         SAMTOOLS_FAIDX.out.fai
     )
+
+    BEACON_SV2BFF(sv_vcfs, file("${projectDir}/scripts/sv_to_bff.py"))
+
 }
