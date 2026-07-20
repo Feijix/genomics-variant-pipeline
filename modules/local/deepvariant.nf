@@ -13,6 +13,7 @@ process DEEPVARIANT {
     tuple val(meta), path("${meta.id}.deepvariant.vcf.gz"), emit: out
 
     script:
+    def region_arg = params.target_region ? "--regions=${params.target_region}" : ''
     """
     mkdir -p output
     /opt/deepvariant/bin/run_deepvariant \\
@@ -22,7 +23,7 @@ process DEEPVARIANT {
       --output_vcf=output/${meta.id}.deepvariant.vcf.gz \\
       --num_shards=${task.cpus} \\
       --sample_name=${meta.id} \\
-      --regions=chr20
+      ${region_arg}
 
     mv output/${meta.id}.deepvariant.vcf.gz ${meta.id}.deepvariant.vcf.gz
     """
