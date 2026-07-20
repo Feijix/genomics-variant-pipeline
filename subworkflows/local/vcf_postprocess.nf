@@ -14,6 +14,7 @@ include { BCFTOOLS_VIEW   } from '../../modules/local/bcftools_view.nf'
 include { BCFTOOLS_NORM   } from '../../modules/local/bcftools_norm.nf'
 include { ENSEMBLVEP_VEP  } from '../../modules/local/ensemblvep_vep.nf'
 include { HAPPY_HAPPY     } from '../../modules/local/happy_happy.nf'
+include { SOMPY_SOMPY     } from '../../modules/local/sompy_sompy.nf'
 include { BEACON_VCF2BFF  } from '../../modules/local/beacon_vcf2bff.nf'
 
 workflow VCF_POSTPROCESS {
@@ -35,10 +36,19 @@ workflow VCF_POSTPROCESS {
         .map { sample_id, meta, vcf, truth_vcf, truth_tbi, truth_bed ->
             tuple(meta, vcf, truth_vcf, truth_tbi, truth_bed) }
         .filter { meta, vcf, truth_vcf, truth_tbi, truth_bed ->
-            truth_vcf != [] && truth_bed != [] }
-        .set { benchmark_input }
+            truth_vcf && truth_vcf.toString() != '[]' && truth_vcf.exists() &&
+            truth_bed && truth_bed.exists()
+        }
+        .branch { row ->
+            def meta = row[0]
+            somatic:  meta.analysis in ['somatic_paired','somatic_tumoronly']
+            germline: true
+        }
+        .set { bench }
 
-    HAPPY_HAPPY(benchmark_input, reference, fai)
+    HAPPY_HAPPY(bench.germline, reference, fai)
+    SOMPY_SOMPY(bench.somatic,  reference, fai)
+
 
     // ── Beacon v2 BFF conversion: every annotated VCF ──
     BEACON_VCF2BFF(ENSEMBLVEP_VEP.out.vcf)
@@ -46,5 +56,6 @@ workflow VCF_POSTPROCESS {
     emit:
     annotated_vcf     = ENSEMBLVEP_VEP.out.vcf
     benchmark_summary = HAPPY_HAPPY.out.summary
+    somatic_summary   = SOMPY_SOMPY.out.stats
     beacon_bff        = BEACON_VCF2BFF.out.bff
 }
