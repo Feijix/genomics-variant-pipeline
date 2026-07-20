@@ -18,7 +18,7 @@
 
 process BEACON_SV2BFF {
     tag "${meta.id}/${meta.caller}"
-    container 'python:3.11-slim'
+    container 'python:3.11'
 
     input:
     tuple val(meta), path(vcf_file)

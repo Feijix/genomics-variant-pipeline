@@ -1,2 +1,2 @@
-sample,sequencing_type,platform,chemistry,basecaller,fastq_1,fastq_2,aligned_bam,truth_vcf,truth_bed,callers
-HG002_Illumina,shortread,illumina,wgs,,,,data/giab_illumina/HG002_bwa_chr20only.sorted.bam,,,
+sample,subject,status,sequencing_type,platform,chemistry,basecaller,fastq_1,fastq_2,aligned_bam,truth_vcf,truth_bed,callers
+HG002_Illumina,,,shortread,illumina,wgs,,,,data/giab_illumina/HG002_bwa_chr20only.sorted.bam,,,

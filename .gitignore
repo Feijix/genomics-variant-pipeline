@@ -29,3 +29,12 @@ data/sv_ensemble_*/
 data/giab_illumina/
 # Unknown root file
 /python
+
+# Run artifacts
+report.html
+timeline.html
+trace.txt
+
+# Large data (references, resources, sample BAMs)
+data/seqc2/
+data/resources/

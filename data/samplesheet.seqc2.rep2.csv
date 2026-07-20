@@ -1,0 +1,3 @@
+sample,subject,status,sequencing_type,platform,chemistry,basecaller,fastq_1,fastq_2,aligned_bam,truth_vcf,truth_bed,callers
+WGS_IL_T_2,SEQC2_02,tumor,shortread,illumina,wgs,,,,data/seqc2/HCC1395_rep2_chr20.bam,data/seqc2/truth/seqc2_somatic.chr20.vcf.gz,data/seqc2/truth/HC_regions.chr20.bed
+WGS_IL_N_2,SEQC2_02,normal,shortread,illumina,wgs,,,,data/seqc2/HCC1395BL_rep2_chr20.bam,,
