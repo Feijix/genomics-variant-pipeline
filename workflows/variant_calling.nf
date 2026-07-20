@@ -35,6 +35,13 @@ include { SURVIVOR        } from '../modules/local/survivor.nf'
 include { BCFTOOLS_ISEC   } from '../modules/local/bcftools_isec.nf'
 include { BCFTOOLS_CONCAT } from '../modules/local/bcftools_concat.nf'
 include { BEACON_SV2BFF   } from '../modules/local/beacon_sv2bff.nf'
+include { GATK_CREATESEQUENCEDICTIONARY } from '../modules/local/gatk_createsequencedictionary.nf'
+include { GATK_MARKDUPLICATES           } from '../modules/local/gatk_markduplicates.nf'
+include { GATK_MUTECT2                  } from '../modules/local/gatk_mutect2.nf'
+include { GATK_FILTERMUTECTCALLS        } from '../modules/local/gatk_filtermutectcalls.nf'
+include { MANTA_SOMATIC                 } from '../modules/local/manta_somatic.nf'
+include { STRELKA2_SOMATIC              } from '../modules/local/strelka2_somatic.nf'
+include { BCFTOOLS_CONCAT_SOMATIC       } from '../modules/local/bcftools_concat_somatic.nf'
 
 // ─── Routing helpers (inline) ────────────────────────────────────────────────
 
@@ -83,21 +90,27 @@ def resolveProfile(key, profiles, originalKey = null) {
  *   3. CLI --callers <list>  -> intersect with profile's tools
  *   4. Default -> profile.defaults only
  */
-def selectCallers(profile, sampleOverride, cliCallers) {
-    def available = (profile.defaults ?: []) + (profile.alternatives ?: [])
+def selectCallers(profile, sampleOverride, cliCallers, analysis) {
+    def isGermline = (analysis == 'germline')
+    def defaults     = (isGermline ? profile.defaults     : profile.somatic_defaults)     ?: []
+    def alternatives = (isGermline ? profile.alternatives : profile.somatic_alternatives) ?: []
+
+    if (analysis == 'somatic_tumoronly') {
+        defaults     = defaults.findAll     { !it.requires_normal }
+        alternatives = alternatives.findAll { !it.requires_normal }
+    }
+    def available = defaults + alternatives
 
     if (sampleOverride) {
         def names = sampleOverride.split(',').collect { it.trim() } as Set
         return available.findAll { it.tool in names }
     }
-    if (cliCallers == 'all') {
-        return available
-    }
+    if (cliCallers == 'all') return available
     if (cliCallers) {
         def names = cliCallers.split(',').collect { it.trim() } as Set
         return available.findAll { it.tool in names }
     }
-    return profile.defaults ?: []
+    return defaults
 }
 
 
@@ -110,50 +123,111 @@ workflow VARIANT_CALLING {
     SAMTOOLS_FAIDX(file(params.reference))
 
     // ── Load samplesheet, build meta, resolve routing, attach selected callers ──
+    // ── 1. Parse rows into meta. No caller selection yet. ──
     Channel
         .fromPath(params.samplesheet)
         .splitCsv(header: true)
         .map { row ->
             def meta = [
                 id              : row.sample,
+                subject         : row.subject ?: row.sample,
+                status          : row.status  ?: 'normal',
                 sequencing_type : row.sequencing_type,
-                platform        : row.platform        ?: '',
-                chemistry       : row.chemistry       ?: '',
-                basecaller      : row.basecaller      ?: '',
+                platform        : row.platform   ?: '',
+                chemistry       : row.chemistry  ?: '',
+                basecaller      : row.basecaller ?: '',
+                callers_override: row.callers    ?: '',
             ]
             def fastq_1     = row.fastq_1     ? file(row.fastq_1)     : []
             def fastq_2     = row.fastq_2     ? file(row.fastq_2)     : []
             def aligned_bam = row.aligned_bam ? file(row.aligned_bam) : []
             def truth_vcf   = row.truth_vcf   ? file(row.truth_vcf)   : []
             def truth_bed   = row.truth_bed   ? file(row.truth_bed)   : []
-            def callers_override = row.callers ?: ''
 
-            if (!fastq_1 && !aligned_bam) {
+            if (!fastq_1 && !aligned_bam)
                 error "Sample '${meta.id}' has neither fastq_1 nor aligned_bam declared"
-            }
 
             meta.routing_key = buildRoutingKey(meta)
-            def profile = resolveProfile(meta.routing_key, params.routing.profiles)
-            meta.selected_callers = selectCallers(profile, callers_override, params.callers)
-
-            if (meta.selected_callers.isEmpty()) {
-                error "Sample '${meta.id}' (routing '${meta.routing_key}') resolved to zero callers"
-            }
-
             tuple(meta, [fastq_1, fastq_2], aligned_bam, truth_vcf, truth_bed)
         }
+        .set { rows }
+
+    // ── 2. Metadata-only pre-pass: validate each subject, emit pairing facts. ──
+    rows
+        .map { meta, _r, _b, _tv, _tb ->
+            tuple(meta.subject, [id: meta.id, status: meta.status, seqtype: meta.sequencing_type])
+        }
+        .groupTuple()
+        .map { subj, entries ->
+            def bad = entries.findAll { !(it.status in ['tumor', 'normal']) }
+            if (bad)
+                error "Subject '${subj}': invalid status '${bad[0].status}' on sample '${bad[0].id}'."
+
+            def normals = entries.findAll { it.status == 'normal' }
+            def tumors  = entries.findAll { it.status == 'tumor'  }
+
+            if (tumors && normals.size() > 1)
+                error "Subject '${subj}': ${normals.size()} normals with ${tumors.size()} tumor(s). Paired somatic requires exactly one normal."
+
+            if (tumors && normals.size() == 1) {
+                def n = normals[0]
+                tumors.findAll { it.seqtype != n.seqtype }.each { t ->
+                    error "Subject '${subj}': cross-technology T/N pairing not supported (tumor '${t.id}' ${t.seqtype} vs normal '${n.id}' ${n.seqtype})."
+                }
+            }
+            tuple(subj, normals.size() == 1, tumors.size() > 0)
+        }
+        .set { subject_facts }
+
+    // ── 3. Join facts back, resolve analysis, select callers. ──
+    rows
+        .map { meta, r, b, tv, tb -> tuple(meta.subject, meta, r, b, tv, tb) }
+        .combine(subject_facts, by: 0)
+        .map { _subj, meta, r, b, tv, tb, hasNormal, hasTumor ->
+            meta.analysis = meta.status == 'normal' ? 'germline'
+                        : hasNormal               ? 'somatic_paired'
+                        :                           'somatic_tumoronly'
+            meta.is_matched_normal = (meta.status == 'normal' && hasTumor)
+
+            def profile = resolveProfile(meta.routing_key, params.routing.profiles)
+            meta.selected_callers = selectCallers(profile, meta.callers_override, params.callers, meta.analysis)
+
+            if (meta.selected_callers.isEmpty())
+                error "Sample '${meta.id}' (routing '${meta.routing_key}', analysis '${meta.analysis}') resolved to zero callers"
+
+            def tools = meta.selected_callers*.tool
+            if ('strelka2' in tools && !('manta_somatic' in tools))
+                error "Sample '${meta.id}': strelka2 requires manta_somatic (indel candidates)."
+
+            tuple(meta, r, b, tv, tb)
+        }
         .set { samples }
+
+    if (params.skip_bwa_index) {
+        bwa_index = Channel.empty()
+    } else {
+        BWA_MEM_INDEX(file(params.reference))
+        bwa_index = BWA_MEM_INDEX.out.index
+    }
 
     // ── Alignment (all samples through one subworkflow) ──
     ALIGNMENT(
         samples,
         file(params.reference),
-        BWA_MEM_INDEX.out.index,
+        bwa_index,
         SAMTOOLS_FAIDX.out.fai
     )
 
     // ── Fan each aligned sample to one item per selected caller ──
     ALIGNMENT.out.bams
+        .branch { meta, _bam, _bai ->
+            normal: meta.status == 'normal'
+            tumor : true
+        }
+        .set { by_status }
+
+    // Germline fanout: UNCHANGED body, now fed only by normals.
+    by_status.normal
         .flatMap { meta, bam, bai ->
             meta.selected_callers.collect { caller_spec ->
                 def enriched = meta + caller_spec.params + [caller: caller_spec.tool, variant_class: caller_spec.variant_class ?: 'small']
@@ -173,8 +247,8 @@ workflow VARIANT_CALLING {
         .set { per_caller }
 
     // ── Per-caller invocations (Option A dispatch) ──
-    DEEPVARIANT(per_caller.deepvariant, file(params.reference), SAMTOOLS_FAIDX.out.fai)
-    CLAIR3     (per_caller.clair3,      file(params.reference), SAMTOOLS_FAIDX.out.fai)
+    DEEPVARIANT(per_caller.deepvariant, file(params.reference_chr20), file("${params.reference_chr20}.fai"))
+    CLAIR3     (per_caller.clair3,      file(params.reference_chr20), file("${params.reference_chr20}.fai"))
     SNIFFLES2  (per_caller.sniffles2,   file(params.reference), SAMTOOLS_FAIDX.out.fai)
     CUTESV     (per_caller.cutesv,      file(params.reference), SAMTOOLS_FAIDX.out.fai)
     MANTA      (per_caller.manta,       file(params.reference_chr20), file("${params.reference_chr20}.fai"))
@@ -235,24 +309,131 @@ workflow VARIANT_CALLING {
         Channel.empty().set { tagged_concat }
     }
 
-    sv_vcfs
-    .map { meta, vcf -> tuple(meta.id, vcf) }
-    .groupTuple()                                  // [id, [vcf1, vcf2, ...]]
-    .map { id, vcfs -> tuple([id: id], vcfs) }
-    .set { sv_grouped }
+    // ── MarkDuplicates on tumors + matched normals only. ──
+    GATK_MARKDUPLICATES(
+        by_status.tumor.mix(
+            by_status.normal.filter { meta, _bam, _bai -> meta.is_matched_normal }
+        )
+    )
 
+    GATK_MARKDUPLICATES.out.bam
+        .branch { meta, _bam, _bai ->
+            tumor : meta.status == 'tumor'
+            normal: true
+        }
+        .set { md }
+
+    // ── Pair by subject (Rule 2: N tumors × 1 normal → N pairs, falls out of combine). ──
+    md.tumor
+        .map { meta, bam, bai -> tuple(meta.subject, meta, bam, bai) }
+        .combine(md.normal.map { meta, bam, bai -> tuple(meta.subject, meta.id, bam, bai) }, by: 0)
+        .map { _subj, tmeta, tbam, tbai, nid, nbam, nbai ->
+            tuple(tmeta + [normal_id: nid], tbam, tbai, nbam, nbai)
+        }
+        .set { tn_pairs }
+
+    // ── Tumor-only: empty normal paths trigger the '[]' idiom in Mutect2. ──
+    md.tumor
+        .filter { meta, _bam, _bai -> meta.analysis == 'somatic_tumoronly' }
+        .map    { meta, bam, bai -> tuple(meta, bam, bai, [], []) }
+        .set { tumor_only }
+
+    // ── Somatic per-caller fanout. ──
+    tn_pairs.mix(tumor_only)
+        .flatMap { meta, tbam, tbai, nbam, nbai ->
+            meta.selected_callers.collect { spec ->
+                def enriched = meta + spec.params + [caller: spec.tool, variant_class: spec.variant_class ?: 'small']
+                tuple(enriched, tbam, tbai, nbam, nbai)
+            }
+        }
+        .branch { meta, _tb, _ti, _nb, _ni ->
+            mutect2      : meta.caller == 'mutect2'
+            strelka2     : meta.caller == 'strelka2'
+            manta_somatic: meta.caller == 'manta_somatic'
+        }
+        .set { per_somatic }
+
+    // ── Reference dict + calling-reference handles. ──
+    GATK_CREATESEQUENCEDICTIONARY(file(params.reference))
+    def ref_calling = file(params.reference)
+    def fai_calling = SAMTOOLS_FAIDX.out.fai
+
+    // ── Mutect2 → FilterMutectCalls. ──
+    GATK_MUTECT2(
+        per_somatic.mutect2,
+        ref_calling, fai_calling, GATK_CREATESEQUENCEDICTIONARY.out.dict,
+        [ file(params.germline_resource), file("${params.germline_resource}.tbi") ],
+        [ file(params.pon),               file("${params.pon}.tbi") ]
+    )
+    GATK_FILTERMUTECTCALLS(
+        GATK_MUTECT2.out.vcf.join(GATK_MUTECT2.out.tbi).join(GATK_MUTECT2.out.stats),
+        ref_calling, fai_calling, GATK_CREATESEQUENCEDICTIONARY.out.dict
+    )
+
+    def call_regions = [ file(params.call_regions), file("${params.call_regions}.tbi") ]
+    
+    // ── Manta somatic (paired only; per_somatic.manta_somatic is empty for tumor-only). ──
+    MANTA_SOMATIC(per_somatic.manta_somatic, file(params.reference), SAMTOOLS_FAIDX.out.fai, call_regions)
+
+    // ── Strelka2: serial on Manta's indel candidates. Join by sample id. ──
+    per_somatic.strelka2
+        .map { meta, tb, ti, nb, ni -> tuple(meta.id, meta, tb, ti, nb, ni) }
+        .join(
+            MANTA_SOMATIC.out.indel_candidates
+                .join(MANTA_SOMATIC.out.indel_candidates_tbi)
+                .map { meta, vcf, tbi -> tuple(meta.id, vcf, tbi) }
+        )
+        .map { _id, meta, tb, ti, nb, ni, cvcf, ctbi -> tuple(meta, tb, ti, nb, ni, cvcf, ctbi) }
+        .set { strelka_in }
+
+    STRELKA2_SOMATIC(strelka_in, ref_calling, fai_calling, call_regions)
+
+    // ── Merge Strelka2 SNVs + indels (aliased CONCAT). ──
+    BCFTOOLS_CONCAT_SOMATIC(
+        STRELKA2_SOMATIC.out.snvs.join(STRELKA2_SOMATIC.out.indels)
+            .map { meta, snvs, indels ->
+                tuple(meta + [caller: 'strelka2'], snvs, indels) },
+        ref_calling
+    )
+
+    // ── Collect somatic small variants (kept OUT of the germline ensemble). ──
+    GATK_FILTERMUTECTCALLS.out.vcf
+        .map { meta, vcf -> tuple(meta + [caller: 'mutect2'], vcf) }
+        .mix(BCFTOOLS_CONCAT_SOMATIC.out.vcf.map { meta, vcf -> tuple(meta + [caller: 'strelka2'], vcf) })
+        .set { somatic_small_vcfs }
+
+    sv_vcfs
+        .map { meta, vcf -> tuple(meta.id, vcf) }
+        .groupTuple()                                  // [id, [vcf1, vcf2, ...]]
+        .map { id, vcfs -> tuple([id: id], vcfs) }
+        .set { sv_grouped }
+    
+    sv_vcfs
+        .mix(MANTA_SOMATIC.out.sv.map { meta, vcf -> tuple(meta + [caller: 'manta_somatic'], vcf) })
+        .set { sv_vcfs }
+
+    // SURVIVOR guard: a tumor's only SV caller is manta_somatic → group of one.
+    sv_vcfs
+        .map { meta, vcf -> tuple(meta.id, vcf) }
+        .groupTuple()
+        .filter { _id, vcfs -> vcfs.size() >= 2 }     // ← NEW LINE
+        .map { id, vcfs -> tuple([id: id], vcfs) }
+        .set { sv_grouped }
+        
     SURVIVOR(sv_grouped)
 
     // ── All VCFs (primary + ensemble) into postprocess ──
     primary_vcfs
         .mix(tagged_isec)
         .mix(tagged_concat)
+        .mix(somatic_small_vcfs)
         .set { all_vcfs }
 
     // ── Per-sample truth assets ──
     samples
         .map { meta, _reads, _bam, truth_vcf, truth_bed ->
-            tuple(meta.id, truth_vcf, file(truth_vcf.toString() + ".tbi"), truth_bed)
+            def tbi = truth_vcf ? file(truth_vcf.toString() + ".tbi") : []
+            tuple(meta.id, truth_vcf ?: [], tbi, truth_bed ?: [])
         }
         .set { truth_ch }
 
