@@ -1,0 +1,2 @@
+sample,subject,status,sequencing_type,platform,chemistry,basecaller,fastq_1,fastq_2,aligned_bam,truth_vcf,truth_bed,callers
+HG001_WGS,HG001,normal,shortread,illumina,wgs,,,,data/wgs/HG001_wgs.bam,,,

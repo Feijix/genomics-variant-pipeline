@@ -38,3 +38,13 @@ trace.txt
 # Large data (references, resources, sample BAMs)
 data/seqc2/
 data/resources/
+
+# Run artefacts
+trace/
+test/results/
+test/logs/
+test/.regression_state
+
+# Data indices that landed outside data/
+*.crai
+NA12878.final.cram*

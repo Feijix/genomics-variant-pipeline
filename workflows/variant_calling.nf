@@ -20,9 +20,11 @@ include { SAMTOOLS_FAIDX } from '../modules/local/samtools_faidx.nf'
 
 include { ALIGNMENT       } from '../subworkflows/local/alignment.nf'
 include { VCF_POSTPROCESS } from '../subworkflows/local/vcf_postprocess.nf'
+include { QUALITY_CONTROL } from '../subworkflows/local/quality_control.nf'            
 
 include { DEEPVARIANT     } from '../modules/local/deepvariant.nf'
 include { CLAIR3          } from '../modules/local/clair3.nf'
+include { CLAIRS          } from '../modules/local/clairs.nf'
 include { SNIFFLES2       } from '../modules/local/sniffles2.nf'
 include { CUTESV          } from '../modules/local/cutesv.nf'
 include { MANTA           } from '../modules/local/manta.nf'
@@ -34,6 +36,8 @@ include { CONVERT_GRIDSS  } from '../modules/local/convert_gridss.nf'
 include { SURVIVOR        } from '../modules/local/survivor.nf'
 include { BCFTOOLS_ISEC   } from '../modules/local/bcftools_isec.nf'
 include { BCFTOOLS_CONCAT } from '../modules/local/bcftools_concat.nf'
+include { BCFTOOLS_VIEW_SV } from '../modules/local/bcftools_view_sv.nf'
+include { TRUVARI_BENCH   } from '../modules/local/truvari_bench.nf'
 include { BEACON_SV2BFF   } from '../modules/local/beacon_sv2bff.nf'
 include { GATK_CREATESEQUENCEDICTIONARY } from '../modules/local/gatk_createsequencedictionary.nf'
 include { GATK_MARKDUPLICATES           } from '../modules/local/gatk_markduplicates.nf'
@@ -42,7 +46,7 @@ include { GATK_FILTERMUTECTCALLS        } from '../modules/local/gatk_filtermute
 include { MANTA_SOMATIC                 } from '../modules/local/manta_somatic.nf'
 include { STRELKA2_SOMATIC              } from '../modules/local/strelka2_somatic.nf'
 include { BCFTOOLS_CONCAT_SOMATIC       } from '../modules/local/bcftools_concat_somatic.nf'
-
+include { BCFTOOLS_CONCAT_SOMATIC as BCFTOOLS_CONCAT_CLAIRS } from '../modules/local/bcftools_concat_somatic.nf'
 // ─── Routing helpers (inline) ────────────────────────────────────────────────
 
 /**
@@ -119,7 +123,6 @@ def selectCallers(profile, sampleOverride, cliCallers, analysis) {
 workflow VARIANT_CALLING {
 
     // ── Reference indexing ──
-    BWA_MEM_INDEX(file(params.reference))
     SAMTOOLS_FAIDX(file(params.reference))
 
     // ── Load samplesheet, build meta, resolve routing, attach selected callers ──
@@ -192,9 +195,14 @@ workflow VARIANT_CALLING {
             def profile = resolveProfile(meta.routing_key, params.routing.profiles)
             meta.selected_callers = selectCallers(profile, meta.callers_override, params.callers, meta.analysis)
 
-            if (meta.selected_callers.isEmpty())
-                error "Sample '${meta.id}' (routing '${meta.routing_key}', analysis '${meta.analysis}') resolved to zero callers"
-
+            if (meta.selected_callers.isEmpty()) {
+                if (meta.status == 'normal' && meta.is_matched_normal) {
+                    log.info "Sample '${meta.id}' is a matched normal; callers run on the tumour."
+                } else {
+                    error "Sample '${meta.id}' (routing '${meta.routing_key}', analysis '${meta.analysis}') resolved to zero callers"
+                }
+            }
+                
             def tools = meta.selected_callers*.tool
             if ('strelka2' in tools && !('manta_somatic' in tools))
                 error "Sample '${meta.id}': strelka2 requires manta_somatic (indel candidates)."
@@ -203,7 +211,7 @@ workflow VARIANT_CALLING {
         }
         .set { samples }
 
-    if (params.skip_bwa_index) {
+    if (params.skip_bwa_index.toString() == 'true') {
         bwa_index = Channel.empty()
     } else {
         BWA_MEM_INDEX(file(params.reference))
@@ -247,16 +255,16 @@ workflow VARIANT_CALLING {
         .set { per_caller }
 
     // ── Per-caller invocations (Option A dispatch) ──
-    DEEPVARIANT(per_caller.deepvariant, file(params.reference_chr20), file("${params.reference_chr20}.fai"))
-    CLAIR3     (per_caller.clair3,      file(params.reference_chr20), file("${params.reference_chr20}.fai"))
+    DEEPVARIANT(per_caller.deepvariant, file(params.reference_germline), file("${params.reference_germline}.fai"))
+    CLAIR3     (per_caller.clair3,      file(params.reference_germline), file("${params.reference_germline}.fai"))
     SNIFFLES2  (per_caller.sniffles2,   file(params.reference), SAMTOOLS_FAIDX.out.fai)
     CUTESV     (per_caller.cutesv,      file(params.reference), SAMTOOLS_FAIDX.out.fai)
-    MANTA      (per_caller.manta,       file(params.reference_chr20), file("${params.reference_chr20}.fai"))
-    DELLY      (per_caller.delly,       file(params.reference_chr20), file("${params.reference_chr20}.fai"))
+    MANTA      (per_caller.manta,       file(params.reference_germline), file("${params.reference_germline}.fai"))
+    DELLY      (per_caller.delly,       file(params.reference_germline), file("${params.reference_germline}.fai"))
     CONVERT_DELLY(DELLY.out.bcf.join(DELLY.out.csi))
-    SMOOVE     (per_caller.smoove, file(params.reference_chr20), file("${params.reference_chr20}.fai"))
-    GRIDSS(per_caller.gridss, file(params.reference_chr20), file("${params.reference_chr20}.fai"))
-    CONVERT_GRIDSS(GRIDSS.out.bnd, file("${params.reference_chr20}.fai"))
+    SMOOVE     (per_caller.smoove, file(params.reference_germline), file("${params.reference_germline}.fai"))
+    GRIDSS(per_caller.gridss, file(params.reference_germline), file("${params.reference_germline}.fai"))
+    CONVERT_GRIDSS(GRIDSS.out.bnd, file("${params.reference_germline}.fai"))
     DEEPVARIANT.out.out
         .map { meta, vcf -> tuple(meta + [caller: 'deepvariant'], vcf) }
         .set { tagged_dv }
@@ -350,6 +358,7 @@ workflow VARIANT_CALLING {
             mutect2      : meta.caller == 'mutect2'
             strelka2     : meta.caller == 'strelka2'
             manta_somatic: meta.caller == 'manta_somatic'
+            clairs       : meta.caller == 'clairs'
         }
         .set { per_somatic }
 
@@ -357,6 +366,14 @@ workflow VARIANT_CALLING {
     GATK_CREATESEQUENCEDICTIONARY(file(params.reference))
     def ref_calling = file(params.reference)
     def fai_calling = SAMTOOLS_FAIDX.out.fai
+
+    def germline_resource = params.germline_resource
+        ? [ file(params.germline_resource), file("${params.germline_resource}.tbi") ]
+        : [ [], [] ]
+
+    def pon = params.pon
+        ? [ file(params.pon), file("${params.pon}.tbi") ]
+        : [ [], [] ]
 
     // ── Mutect2 → FilterMutectCalls. ──
     GATK_MUTECT2(
@@ -370,8 +387,10 @@ workflow VARIANT_CALLING {
         ref_calling, fai_calling, GATK_CREATESEQUENCEDICTIONARY.out.dict
     )
 
-    def call_regions = [ file(params.call_regions), file("${params.call_regions}.tbi") ]
-    
+    def call_regions = params.call_regions
+        ? [ file(params.call_regions), file("${params.call_regions}.tbi") ]
+        : [ [], [] ]
+        
     // ── Manta somatic (paired only; per_somatic.manta_somatic is empty for tumor-only). ──
     MANTA_SOMATIC(per_somatic.manta_somatic, file(params.reference), SAMTOOLS_FAIDX.out.fai, call_regions)
 
@@ -396,10 +415,23 @@ workflow VARIANT_CALLING {
         ref_calling
     )
 
+    CLAIRS(
+        per_somatic.clairs,
+        file(params.reference_germline),
+        file("${params.reference_germline}.fai")
+    )
+
+    BCFTOOLS_CONCAT_CLAIRS(
+        CLAIRS.out.snvs.join(CLAIRS.out.indels)
+            .map { meta, snvs, indels -> tuple(meta + [caller: 'clairs'], snvs, indels) },
+        ref_calling
+    )
+
     // ── Collect somatic small variants (kept OUT of the germline ensemble). ──
     GATK_FILTERMUTECTCALLS.out.vcf
         .map { meta, vcf -> tuple(meta + [caller: 'mutect2'], vcf) }
         .mix(BCFTOOLS_CONCAT_SOMATIC.out.vcf.map { meta, vcf -> tuple(meta + [caller: 'strelka2'], vcf) })
+        .mix(BCFTOOLS_CONCAT_CLAIRS.out.vcf)
         .set { somatic_small_vcfs }
 
     sv_vcfs
@@ -410,7 +442,10 @@ workflow VARIANT_CALLING {
     
     sv_vcfs
         .mix(MANTA_SOMATIC.out.sv.map { meta, vcf -> tuple(meta + [caller: 'manta_somatic'], vcf) })
-        .set { sv_vcfs }
+        .set { sv_vcfs_raw }
+	
+    BCFTOOLS_VIEW_SV(sv_vcfs_raw)
+    BCFTOOLS_VIEW_SV.out.vcf.set { sv_vcfs }
 
     // SURVIVOR guard: a tumor's only SV caller is manta_somatic → group of one.
     sv_vcfs
@@ -437,6 +472,29 @@ workflow VARIANT_CALLING {
         }
         .set { truth_ch }
 
+    // ── SV benchmarking ──
+    // Runs outside VCF_POSTPROCESS: SVs need Truvari rather than hap.py, and the
+    // normalise/annotate chain does not apply to breakend records.
+    BCFTOOLS_VIEW_SV.out.vcf
+        .join(BCFTOOLS_VIEW_SV.out.tbi)
+        .mix(
+            SURVIVOR.out.union.join(SURVIVOR.out.union_tbi)
+                .map { meta, vcf, tbi -> tuple(meta + [caller: 'survivor_union'], vcf, tbi) },
+            SURVIVOR.out.consensus.join(SURVIVOR.out.consensus_tbi)
+                .map { meta, vcf, tbi -> tuple(meta + [caller: 'survivor_consensus'], vcf, tbi) }
+        )
+        .map { meta, vcf, tbi -> tuple(meta.id, meta, vcf, tbi) }
+        .combine(truth_ch, by: 0)
+        .map { id, meta, vcf, tbi, tv, tt, tb -> tuple(meta, vcf, tbi, tv, tt, tb) }
+        .filter { meta, vcf, tbi, tv, tt, tb -> tv && tv.exists() && tb && tb.exists() }
+        .set { sv_bench_input }
+
+    TRUVARI_BENCH(
+        sv_bench_input,
+        file(params.reference_germline),
+        file("${params.reference_germline}.fai")
+    )
+
     // ── Shared postprocessing ──
     VCF_POSTPROCESS(
         all_vcfs,
@@ -447,4 +505,9 @@ workflow VARIANT_CALLING {
 
     BEACON_SV2BFF(sv_vcfs, file("${projectDir}/scripts/sv_to_bff.py"))
 
+    QUALITY_CONTROL(
+        ALIGNMENT.out.bams,
+        all_vcfs,
+        GATK_MARKDUPLICATES.out.metrics
+    )
 }

@@ -53,3 +53,10 @@ All results below: chr20 only, GIAB v4.2.1 high-confidence regions (`*_noinconsi
 ## How to reproduce
 
 For each benchmark above, the inputs (FASTQ source URL, samplesheet entry, Clair3 model, filter applied) are sufficient to reproduce the result on any machine running the pipeline at the documented commit. Pipeline commit hashes for each run can be added once results are committed to the repository.
+
+Somatic (SEQC2 HCC1395/HCC1395BL chr20, truth v1.2.1: 1106 SNV / 42 indel)
+  rep1 T/N   → data/outputs/benchmark/somatic.rep1_paired.bak/
+  tumour-only→ data/outputs/benchmark/somatic.tumoronly.bak/
+  rep2 T/N   → data/outputs/benchmark/somatic/WGS_IL_T_2.*
+  cmd: nextflow run main.nf -profile docker --samplesheet <sheet> \
+       --callers mutect2,strelka2,manta_somatic,deepvariant --skip_bwa_index true

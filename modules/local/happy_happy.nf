@@ -16,7 +16,6 @@ process HAPPY_HAPPY {
 
     script:
     """
-    echo -e "chr20\\t0\\t64444167" > chr20.bed
 
     /opt/hap.py/bin/hap.py \\
       ${truth_vcf} \\
@@ -24,7 +23,6 @@ process HAPPY_HAPPY {
       -r ${reference} \\
       -f ${truth_bed} \\
       -o ${meta.id}.${meta.caller}.benchmark \\
-      -T chr20.bed \\
       --threads ${task.cpus} \\
       --engine=vcfeval
     """

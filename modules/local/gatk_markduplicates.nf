@@ -1,7 +1,6 @@
 process GATK_MARKDUPLICATES {
     tag "${meta.id}"
     container 'broadinstitute/gatk:4.6.2.0'
-    publishDir "${params.outdir}/bam", mode: 'copy'
     cpus 4
     memory '16 GB'
 

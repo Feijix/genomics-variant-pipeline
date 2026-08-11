@@ -1,0 +1,74 @@
+2026-07-31 13:36:40,452 [INFO] Truvari v5.4.0
+2026-07-31 13:36:40,453 [INFO] Command /usr/local/bin/truvari bench -b GRCh38_HG2-T2TQ100-V1.1_stvar.vcf.gz -c HG002_Illumina.sv_union.vcf.gz -o HG002_Illumina.survivor_union.truvari --includebed HG002_SV_chr20.benchmark.bed -f GRCh38.chr20.fa --passonly --sizemin 50 --sizemax 50000 --pctseq 0 --dup-to-ins --pctsize 0.7 --refdist 500 --pick single
+2026-07-31 13:36:40,454 [INFO] Params:
+{
+    "base": "/home/afonso/genomics-variant-pipeline/work/df/6eb7fcc3cd7e9b4192ed09ea2280bb/GRCh38_HG2-T2TQ100-V1.1_stvar.vcf.gz",
+    "comp": "/home/afonso/genomics-variant-pipeline/work/df/6eb7fcc3cd7e9b4192ed09ea2280bb/HG002_Illumina.sv_union.vcf.gz",
+    "output": "HG002_Illumina.survivor_union.truvari",
+    "includebed": "/home/afonso/genomics-variant-pipeline/work/df/6eb7fcc3cd7e9b4192ed09ea2280bb/HG002_SV_chr20.benchmark.bed",
+    "extend": 0,
+    "debug": false,
+    "reference": "/home/afonso/genomics-variant-pipeline/work/df/6eb7fcc3cd7e9b4192ed09ea2280bb/GRCh38.chr20.fa",
+    "refdist": 500,
+    "pctseq": 0.0,
+    "pctsize": 0.7,
+    "pctovl": 0.0,
+    "typeignore": false,
+    "no_roll": false,
+    "chunksize": 1000,
+    "bSample": "HG002",
+    "cSample": "HG002_Illumina",
+    "dup_to_ins": true,
+    "bnddist": 100,
+    "sizemin": 50,
+    "sizefilt": 30,
+    "sizemax": 50000,
+    "passonly": true,
+    "no_ref": false,
+    "pick": "single",
+    "ignore_monref": true,
+    "check_multi": true,
+    "check_monref": true,
+    "no_single_bnd": true,
+    "write_resolved": false,
+    "decompose": true,
+    "short_circuit": false,
+    "skip_gt": false,
+    "max_resolve": 25000
+}
+2026-07-31 13:36:40,625 [INFO] Including 213 bed regions
+2026-07-31 13:36:47,279 [INFO] Zipped 101230 variants Counter({'base': 100995, 'comp': 235})
+2026-07-31 13:36:47,279 [INFO] 548 chunks of 101230 variants Counter({'__filtered': 100197, 'base': 803, 'comp': 230})
+2026-07-31 13:36:47,753 [INFO] Stats: {
+    "TP-base": 158,
+    "TP-comp": 158,
+    "FP": 72,
+    "FN": 645,
+    "precision": 0.6869565217391305,
+    "recall": 0.19676214196762143,
+    "f1": 0.3059051306873185,
+    "base cnt": 803,
+    "comp cnt": 230,
+    "TP-comp_TP-gt": 51,
+    "TP-comp_FP-gt": 107,
+    "TP-base_TP-gt": 51,
+    "TP-base_FP-gt": 107,
+    "gt_concordance": 0.3227848101265823,
+    "gt_matrix": {
+        "(0, 1)": {
+            "(None, None)": 36,
+            "(0, 1)": 13,
+            "(1, 1)": 2
+        },
+        "(1, 1)": {
+            "(None, None)": 31,
+            "(1, 1)": 20,
+            "(0, 1)": 5
+        },
+        "(1, 0)": {
+            "(0, 1)": 18,
+            "(None, None)": 33
+        }
+    }
+}
+2026-07-31 13:36:47,753 [INFO] Finished bench

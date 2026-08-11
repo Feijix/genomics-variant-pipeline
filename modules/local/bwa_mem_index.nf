@@ -8,7 +8,7 @@ process BWA_MEM_INDEX {
     path(reference)
 
     output:
-    path("${reference}.*"), emit: index
+    path("${reference}.{0123,amb,ann,bwt.2bit.64,pac}"), emit: index
 
     script:
     """

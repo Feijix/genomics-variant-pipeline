@@ -16,9 +16,16 @@
 
 FROM ubuntu:22.04
 
+# build-essential covers gcc/make for both builds.
+# bzip2/lzma/curl dev headers are bcftools requirements: without libcurl4-openssl-dev
+# bcftools builds fine but cannot read remote (HTTPS) files.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
         zlib1g-dev \
+        bzip2 \
+        libbz2-dev \
+        liblzma-dev \
+        libcurl4-openssl-dev \
         wget \
         ca-certificates \
     && rm -rf /var/lib/apt/lists/*
@@ -33,8 +40,22 @@ RUN wget -q https://github.com/fritzsedlazeck/SURVIVOR/archive/refs/tags/1.0.7.t
     && cd / \
     && rm -rf survivor.tar.gz SURVIVOR-1.0.7
 
-# Sanity check — prints version/usage (SURVIVOR exits non-zero on bare call,
-# so grep for the version string instead of relying on exit code).
+# bcftools 1.19 from source. Ubuntu 22.04's apt ships 1.13; the pipeline
+# standardises on 1.19+ (matching staphb/bcftools) so VCF handling is identical
+# in every process that touches a VCF. Used here for sort + index of SURVIVOR's
+# plain-VCF output.
+RUN wget -q https://github.com/samtools/bcftools/releases/download/1.19/bcftools-1.19.tar.bz2 \
+    && tar -xjf bcftools-1.19.tar.bz2 \
+    && cd bcftools-1.19 \
+    && ./configure --prefix=/usr/local \
+    && make -j4 \
+    && make install \
+    && cd / \
+    && rm -rf bcftools-1.19 bcftools-1.19.tar.bz2
+
+# Sanity checks — SURVIVOR exits non-zero on a bare call, so grep for the
+# version string; bcftools --version fails the build loudly if it is broken.
 RUN SURVIVOR 2>&1 | grep -i 'Version' || true
+RUN bcftools --version | head -1
 
 ENTRYPOINT []

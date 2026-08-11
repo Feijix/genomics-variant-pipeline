@@ -36,15 +36,17 @@ process SURVIVOR {
     tuple val(meta), path(vcfs)
 
     output:
-    tuple val(meta), path("${meta.id}.sv_union.vcf"),     emit: union
-    tuple val(meta), path("${meta.id}.sv_consensus.vcf"), emit: consensus
+    tuple val(meta), path("${meta.id}.sv_union.vcf.gz"),         emit: union
+    tuple val(meta), path("${meta.id}.sv_union.vcf.gz.tbi"),     emit: union_tbi
+    tuple val(meta), path("${meta.id}.sv_consensus.vcf.gz"),     emit: consensus
+    tuple val(meta), path("${meta.id}.sv_consensus.vcf.gz.tbi"), emit: consensus_tbi
 
     script:
     def consensus_n = params.survivor_consensus ?: 2
     """
     # SURVIVOR reads plain VCF — decompress any gzipped inputs.
     : > vcf_list.txt
-    for v in ${vcfs}; do
+    for v in \$(ls ${vcfs} | sort); do
       case "\$v" in
         *.gz) zcat "\$v" > "\${v%.gz}.plain.vcf"; echo "\${v%.gz}.plain.vcf" >> vcf_list.txt ;;
         *)    echo "\$v" >> vcf_list.txt ;;
@@ -54,5 +56,10 @@ process SURVIVOR {
     # Union (>=1 caller) and consensus (>=N callers).
     SURVIVOR merge vcf_list.txt 1000 1 1 1 0 50 ${meta.id}.sv_union.vcf
     SURVIVOR merge vcf_list.txt 1000 ${consensus_n} 1 1 0 50 ${meta.id}.sv_consensus.vcf
+    
+    for f in ${meta.id}.sv_union ${meta.id}.sv_consensus; do
+        bcftools sort \$f.vcf -Oz -o \$f.vcf.gz
+        bcftools index -t \$f.vcf.gz
+    done
     """
 }

@@ -11,7 +11,9 @@ process SAMTOOLS_INDEX {
     script:
     """
     # Rename for consistency with downstream naming, then index
-    cp ${bam_file} ${meta.id}.aligned.bam
+    if [ "${bam_file}" != "${meta.id}.aligned.bam" ]; then
+        ln -s ${bam_file} ${meta.id}.aligned.bam
+    fi
     samtools index ${meta.id}.aligned.bam
     """
 }
