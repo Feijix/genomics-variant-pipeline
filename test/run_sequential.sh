@@ -40,7 +40,8 @@ CONFIGS=(
     somatic_tumouronly
     somatic_longread
     sv_strict
-    sv_permissive
+    sv_permissive,
+    sv_longread
 )
 
 case "${1:-}" in

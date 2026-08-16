@@ -64,6 +64,7 @@ process CUTESV {
       ${reference} \\
       ${meta.id}.cutesv.vcf \\
       cutesv_work \\
+      --genotype \\
       --threads ${task.cpus} \\
       --sample ${meta.id} \\
       ${meta.cutesv_params}

@@ -1,0 +1,3 @@
+sample,subject,status,sequencing_type,platform,chemistry,basecaller,fastq_1,fastq_2,aligned_bam,truth_vcf,truth_bed,callers
+HG002_HiFi,HG002_HiFi,normal,longread,pacbio,hifi,,,,data/samples/HG002_HiFi_chr20.bam,data/giab/HG002_SV/GRCh38_HG2-T2TQ100-V1.1_stvar.vcf.gz,data/giab/HG002_SV/HG002_SV_chr20.benchmark.bed,
+HG002_ONT_R10,HG002_ONT_R10,normal,longread,ont,r10.4.1,dorado_sup,data/samples/HG002_ONT_R10_chr20.fastq.gz,,,data/giab/HG002_SV/GRCh38_HG2-T2TQ100-V1.1_stvar.vcf.gz,data/giab/HG002_SV/HG002_SV_chr20.benchmark.bed,

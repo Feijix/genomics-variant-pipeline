@@ -51,6 +51,7 @@ CONFIG_NAMES=(
     somatic_longread
     sv_strict
     sv_permissive
+    sv_longread
 )
 
 if [ "$ARG" = "--list" ]; then
@@ -187,6 +188,19 @@ run_config sv_permissive \
     --reference data/reference/GRCh38.chr20.fa \
     --truvari_pctseq 0 --truvari_dup_to_ins true
 
+# 9. Structural variants, long read — Sniffles2 and cuteSV on HG002.
+run_config sv_longread \
+    data/samplesheet.regression.sv_longread.csv \
+    data/samples/HG002_HiFi_chr20.bam \
+    data/samples/HG002_ONT_R10_chr20.fastq.gz \
+    data/giab/HG002_SV/GRCh38_HG2-T2TQ100-V1.1_stvar.vcf.gz \
+    data/giab/HG002_SV/HG002_SV_chr20.benchmark.bed \
+    -- \
+    --samplesheet data/samplesheet.regression.sv_longread.csv \
+    --callers sniffles2,cutesv \
+    --reference data/reference/GRCh38.chr20.fa \
+    --skip_bwa_index true \
+    --truvari_pctseq 0.7 --truvari_dup_to_ins false
 # ── Summary ──────────────────────────────────────────────────────────────────
 echo
 echo "======================================================================"

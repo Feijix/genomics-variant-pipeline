@@ -1,0 +1,76 @@
+2026-08-16 15:07:04,603 [INFO] Truvari v5.4.0
+2026-08-16 15:07:04,604 [INFO] Command /usr/local/bin/truvari bench -b GRCh38_HG2-T2TQ100-V1.1_stvar.vcf.gz -c HG002_HiFi.sv_union.vcf.gz -o HG002_HiFi.survivor_union.truvari --includebed HG002_SV_chr20.benchmark.bed -f GRCh38.chr20.fa --passonly --sizemin 50 --sizemax 50000 --pctseq 0.7 --pctsize 0.7 --refdist 500 --pick single
+2026-08-16 15:07:04,605 [INFO] Params:
+{
+    "base": "/home/afonso/genomics-variant-pipeline/work/db/8f5029ba6ce0214fd1066c63a3bbd2/GRCh38_HG2-T2TQ100-V1.1_stvar.vcf.gz",
+    "comp": "/home/afonso/genomics-variant-pipeline/work/db/8f5029ba6ce0214fd1066c63a3bbd2/HG002_HiFi.sv_union.vcf.gz",
+    "output": "HG002_HiFi.survivor_union.truvari",
+    "includebed": "/home/afonso/genomics-variant-pipeline/work/db/8f5029ba6ce0214fd1066c63a3bbd2/HG002_SV_chr20.benchmark.bed",
+    "extend": 0,
+    "debug": false,
+    "reference": "/home/afonso/genomics-variant-pipeline/work/db/8f5029ba6ce0214fd1066c63a3bbd2/GRCh38.chr20.fa",
+    "refdist": 500,
+    "pctseq": 0.7,
+    "pctsize": 0.7,
+    "pctovl": 0.0,
+    "typeignore": false,
+    "no_roll": false,
+    "chunksize": 1000,
+    "bSample": "HG002",
+    "cSample": "HG002_HiFi",
+    "dup_to_ins": false,
+    "bnddist": 100,
+    "sizemin": 50,
+    "sizefilt": 30,
+    "sizemax": 50000,
+    "passonly": true,
+    "no_ref": false,
+    "pick": "single",
+    "ignore_monref": true,
+    "check_multi": true,
+    "check_monref": true,
+    "no_single_bnd": true,
+    "write_resolved": false,
+    "decompose": true,
+    "short_circuit": false,
+    "skip_gt": false,
+    "max_resolve": 25000
+}
+2026-08-16 15:07:04,792 [WARNING] 1 contigs present in comparison VCF header are not in baseline VCF.
+2026-08-16 15:07:04,795 [INFO] Including 213 bed regions
+2026-08-16 15:07:11,232 [INFO] Zipped 101539 variants Counter({'base': 100995, 'comp': 544})
+2026-08-16 15:07:11,233 [INFO] 524 chunks of 101539 variants Counter({'__filtered': 100192, 'base': 803, 'comp': 544})
+2026-08-16 15:07:11,665 [INFO] Stats: {
+    "TP-base": 510,
+    "TP-comp": 510,
+    "FP": 34,
+    "FN": 293,
+    "precision": 0.9375,
+    "recall": 0.635118306351183,
+    "f1": 0.757238307349666,
+    "base cnt": 803,
+    "comp cnt": 544,
+    "TP-comp_TP-gt": 351,
+    "TP-comp_FP-gt": 159,
+    "TP-base_TP-gt": 351,
+    "TP-base_FP-gt": 159,
+    "gt_concordance": 0.6882352941176471,
+    "gt_matrix": {
+        "(1, 1)": {
+            "(1, 1)": 138,
+            "(0, 1)": 1,
+            "(None, None)": 1
+        },
+        "(0, 1)": {
+            "(0, 1)": 118,
+            "(1, 1)": 60,
+            "(None, None)": 14
+        },
+        "(1, 0)": {
+            "(1, 1)": 61,
+            "(0, 1)": 95,
+            "(None, None)": 22
+        }
+    }
+}
+2026-08-16 15:07:11,665 [INFO] Finished bench
