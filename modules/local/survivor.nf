@@ -54,8 +54,8 @@ process SURVIVOR {
     done
 
     # Union (>=1 caller) and consensus (>=N callers).
-    SURVIVOR merge vcf_list.txt 1000 1 1 1 0 50 ${meta.id}.sv_union.vcf
-    SURVIVOR merge vcf_list.txt 1000 ${consensus_n} 1 1 0 50 ${meta.id}.sv_consensus.vcf
+    SURVIVOR merge vcf_list.txt ${params.survivor_max_dist} 1 1 1 0 50 ${meta.id}.sv_union.vcf
+    SURVIVOR merge vcf_list.txt ${params.survivor_max_dist} ${consensus_n} 1 1 0 50 ${meta.id}.sv_consensus.vcf
     
     for f in ${meta.id}.sv_union ${meta.id}.sv_consensus; do
         bcftools sort \$f.vcf -Oz -o \$f.vcf.gz

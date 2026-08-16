@@ -11,10 +11,18 @@
 
 FROM python:3.10-slim
 
+# procps supplies `ps`, which Nextflow requires to collect per-task CPU and
+# memory metrics. The -slim images omit it, and the task fails after the
+# script itself has completed successfully.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends procps \
+    && rm -rf /var/lib/apt/lists/*
+
 # Sniffles is pure-Python + pysam; pin the exact release.
 RUN pip install --no-cache-dir sniffles==2.8.0
 
 # Sanity check at build time — fails the build if the binary is missing.
 RUN sniffles --version
+RUN ps --version
 
 ENTRYPOINT []
