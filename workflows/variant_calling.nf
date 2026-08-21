@@ -96,25 +96,41 @@ def resolveProfile(key, profiles, originalKey = null) {
  */
 def selectCallers(profile, sampleOverride, cliCallers, analysis) {
     def isGermline = (analysis == 'germline')
-    def defaults     = (isGermline ? profile.defaults     : profile.somatic_defaults)     ?: []
-    def alternatives = (isGermline ? profile.alternatives : profile.somatic_alternatives) ?: []
+    def allDefaults     = (isGermline ? profile.defaults     : profile.somatic_defaults)     ?: []
+    def allAlternatives = (isGermline ? profile.alternatives : profile.somatic_alternatives) ?: []
 
+    // Everything the profile declares, before preconditions are applied. A name
+    // absent from this is a configuration error; a name present here but absent
+    // from `available` was withdrawn by a precondition, which is not an error.
+    def declared = ((profile.defaults ?: []) + (profile.alternatives ?: []) +
+                    (profile.somatic_defaults ?: []) + (profile.somatic_alternatives ?: []))
+
+    def defaults     = allDefaults
+    def alternatives = allAlternatives
     if (analysis == 'somatic_tumoronly') {
         defaults     = defaults.findAll     { !it.requires_normal }
         alternatives = alternatives.findAll { !it.requires_normal }
     }
     def available = defaults + alternatives
 
+    def names  = null
+    def source = null
     if (sampleOverride) {
-        def names = sampleOverride.split(',').collect { it.trim() } as Set
-        return available.findAll { it.tool in names }
+        names  = sampleOverride.split(',').collect { it.trim() } as Set
+        source = 'samplesheet'
+    } else if (cliCallers == 'all') {
+        return available
+    } else if (cliCallers) {
+        names  = cliCallers.split(',').collect { it.trim() } as Set
+        source = '--callers'
+    } else {
+        return defaults
     }
-    if (cliCallers == 'all') return available
-    if (cliCallers) {
-        def names = cliCallers.split(',').collect { it.trim() } as Set
-        return available.findAll { it.tool in names }
-    }
-    return defaults
+
+    def miss = names - declared*.tool
+    if (miss)
+        error "Callers not declared in profile (${source}): ${miss.join(', ')}"
+    return available.findAll { it.tool in names }
 }
 
 
@@ -251,8 +267,13 @@ workflow VARIANT_CALLING {
             delly:       meta.caller == 'delly'
             smoove:      meta.caller == 'smoove'
             gridss:      meta.caller == 'gridss'
+            unmatched:   true
         }
         .set { per_caller }
+ 
+    per_caller.unmatched.map { meta, _b, _i ->
+        error "Caller '${meta.caller}' selected for '${meta.id}' has no dispatch label."
+    }
 
     // ── Per-caller invocations (Option A dispatch) ──
     DEEPVARIANT(per_caller.deepvariant, file(params.reference_germline), file("${params.reference_germline}.fai"))
@@ -359,8 +380,13 @@ workflow VARIANT_CALLING {
             strelka2     : meta.caller == 'strelka2'
             manta_somatic: meta.caller == 'manta_somatic'
             clairs       : meta.caller == 'clairs'
+            unmatched    : true
         }
         .set { per_somatic }
+
+    per_somatic.unmatched.map { meta, _tb, _ti, _nb, _ni ->
+        error "Caller '${meta.caller}' selected for '${meta.id}' has no dispatch label."
+    }
 
     // ── Reference dict + calling-reference handles. ──
     GATK_CREATESEQUENCEDICTIONARY(file(params.reference))
