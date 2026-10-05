@@ -28,10 +28,10 @@ process BEACON_SV2BFF {
     tuple val(meta), path("${meta.id}.${meta.caller}.sv.genomicVariationsVcf.json.gz"), emit: bff
 
     script:
-    def biosample  = meta.biosample  ?: meta.id
-    def individual = meta.individual ?: meta.id
-    def run        = meta.run        ?: "${meta.id}_run"
-    def analysis   = meta.analysis   ?: "${meta.id}_${meta.caller}"
+    def biosample  = meta.biosample         ?: meta.id
+    def individual = meta.individual	    ?: meta.id
+    def run        = meta.run		    ?: "${meta.id}_run"
+    def analysis   = meta.analysis_id	    ?: "${meta.id}_${meta.caller}"
     def assembly   = params.beacon_assembly ?: 'GRCh38'
     """
     python3 ${sv_script} \\

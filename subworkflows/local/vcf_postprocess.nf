@@ -3,11 +3,13 @@
  *
  * Uniform per-caller postprocess applied to every caller's output:
  *   BCFTOOLS_VIEW (FILTER=PASS) -> BCFTOOLS_NORM (left-align, split multiallelics)
- *   -> ENSEMBLVEP_VEP (annotate) -> HAPPY_HAPPY (benchmark vs GIAB truth)
- *   -> BEACON_VCF2BFF (annotated VCF -> Beacon v2 genomicVariations BFF)
+ *     -> ENSEMBLVEP_VEP (annotate; published VCF)
+ *     -> HAPPY_HAPPY / SOMPY_SOMPY (benchmark vs truth, from the normalised VCF)
+ *     -> BEACON_VCF2BFF (normalised VCF -> Beacon v2 genomicVariations BFF;
+ *        bff-tools re-annotates with snpEff, so VEP output is not needed here)
  *
  * Benchmark joins by meta.id and only runs when truth_vcf + truth_bed present.
- * Beacon conversion runs on every annotated VCF regardless of truth presence.
+ * Beacon conversion runs on every normalised VCF regardless of truth presence.
  */
 
 include { BCFTOOLS_VIEW   } from '../../modules/local/bcftools_view.nf'
@@ -51,7 +53,7 @@ workflow VCF_POSTPROCESS {
 
 
     // ── Beacon v2 BFF conversion: every annotated VCF ──
-    BEACON_VCF2BFF(ENSEMBLVEP_VEP.out.vcf)
+    BEACON_VCF2BFF(BCFTOOLS_NORM.out.vcf)
 
     emit:
     annotated_vcf     = ENSEMBLVEP_VEP.out.vcf
