@@ -19,16 +19,18 @@ process GATK_MUTECT2 {
     tuple val(meta), path("${meta.id}.mutect2.unfiltered.vcf.gz.stats"), emit: stats
 
     script:
-    def normal_arg = meta.analysis == 'somatic_paired' ? "-I ${normal_bam} -normal ${meta.normal_id}" : ''   
-    def interval_arg = params.target_region    ? "-L ${params.target_region}"                         : ''
+    def normal_arg   = meta.analysis == 'somatic_paired' ? "-I ${normal_bam} -normal ${meta.normal_id}" : ''
+    def interval_arg = params.target_region ? "-L ${params.target_region}" : ''
+    def gr_arg       = germline_resource    ? "--germline-resource ${germline_resource}" : ''   // empty list → no flag
+    def pon_arg      = pon                  ? "--panel-of-normals ${pon}"               : ''
     def avail_mem    = task.memory ? task.memory.toGiga() - 2 : 6
     """
     gatk --java-options "-Xmx${avail_mem}g" Mutect2 \\
       -R ${reference} \\
       -I ${tumor_bam} \\
       ${normal_arg} \\
-      --germline-resource ${germline_resource} \\
-      --panel-of-normals ${pon} \\
+      ${gr_arg} \\
+      ${pon_arg} \\
       ${interval_arg} \\
       --native-pair-hmm-threads ${task.cpus} \\
       -O ${meta.id}.mutect2.unfiltered.vcf.gz

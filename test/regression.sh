@@ -107,8 +107,7 @@ run_config germline_hg001_short \
     -- \
     --samplesheet data/samplesheet.regression.germline_short.csv \
     --callers deepvariant \
-    --reference data/reference/GRCh38.chr20.fa \
-    --reference_germline data/reference/GRCh38.chr20.fa
+    --reference data/reference/GRCh38.chr20.fa
 
 # 2. Germline, long read, HG002 — Clair3 across ONT R10.4.1, ONT R9.4.1, HiFi.
 run_config germline_hg002_long \
