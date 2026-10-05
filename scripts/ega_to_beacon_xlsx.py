@@ -18,7 +18,7 @@ Usage:
 
 Then validate:
     docker run --rm -v "$(pwd)":"$(pwd)" -w "$(pwd)" --entrypoint bash \\
-      manuelrueda/beacon2-cbi-tools:latest -c \\
+      manuelrueda/beacon2-cbi-tools:2.0.12 -c \\
       '/usr/share/beacon2-cbi-tools/bin/bff-tools validate \\
          -i data/beacon_metadata/EGAD00001000082_beacon.xlsx \\
          -o data/beacon_metadata/bff_out'
@@ -55,9 +55,9 @@ INGESTION = {
     # dataset, so no value is derivable and the field is left empty.
     'originType':     (None, None),
 
-    'runDate':        '1970-01-01',
-    'analysisDate':   '1970-01-01',
-    'pipelineName':   'genomics-variant-pipeline v1.0',
+    'runDate':        None,
+    'analysisDate':   None,
+    'pipelineName':   None,
 }
 
 # ── Fields the Beacon v2 model marks mandatory, per entity ───────────────────
