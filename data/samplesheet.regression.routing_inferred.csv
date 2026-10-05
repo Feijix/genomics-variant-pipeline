@@ -1,0 +1,3 @@
+sample,subject,status,sequencing_type,platform,chemistry,basecaller,fastq_1,fastq_2,aligned_bam,truth_vcf,truth_bed,callers
+infer_short,infer_short,normal,,,,,data/routing_test/infer_short_R1.fastq.gz,data/routing_test/infer_short_R2.fastq.gz,,,,
+infer_long,infer_long,normal,,,,,data/routing_test/infer_long.fastq.gz,,,,,

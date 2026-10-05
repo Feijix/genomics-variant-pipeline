@@ -117,7 +117,6 @@ run_config germline_hg002_long \
     data/reference/GRCh38.chr20.fa \
     -- \
     --samplesheet data/samplesheet.regression.germline_long.csv \
-    --callers clair3 \
     --reference data/reference/GRCh38.chr20.fa \
     --skip_bwa_index true
 
@@ -171,7 +170,7 @@ run_config sv_strict \
     data/giab/HG002_SV/HG002_SV_chr20.benchmark.bed \
     -- \
     --samplesheet data/samplesheet.hg002_sv.csv \
-    --callers manta,delly,smoove \
+    --callers manta,delly,smoove,gridss \
     --reference data/reference/GRCh38.chr20.fa \
     --truvari_pctseq 0.7 --truvari_dup_to_ins false
 
@@ -179,9 +178,8 @@ run_config sv_strict \
 run_config sv_permissive \
     data/samplesheet.hg002_sv.csv \
     -- \
-    -resume \
     --samplesheet data/samplesheet.hg002_sv.csv \
-    --callers manta,delly,smoove \
+    --callers manta,delly,smoove,gridss \
     --reference data/reference/GRCh38.chr20.fa \
     --truvari_pctseq 0 --truvari_dup_to_ins true
 
@@ -198,8 +196,19 @@ run_config sv_longread \
     --reference data/reference/GRCh38.chr20.fa \
     --skip_bwa_index true \
     --truvari_pctseq 0.7 --truvari_dup_to_ins false
+
+# 10. Routing — undeclared provenance inferred from read length (no --callers).
+run_config routing_inferred \
+   data/samplesheet.regression.routing_inferred.csv \
+   data/routing_test/infer_short_R1.fastq.gz data/routing_test/infer_short_R2.fastq.gz \
+   data/routing_test/infer_long.fastq.gz \
+   data/reference/GRCh38.chr20.fa \
+   -- \
+   --samplesheet data/samplesheet.regression.routing_inferred.csv \
+   --reference data/reference/GRCh38.chr20.fa
+
 # ── Summary ──────────────────────────────────────────────────────────────────
-echo
+# echo
 echo "======================================================================"
 echo "passed:  ${#PASSED[@]}   ${PASSED[*]:-}"
 echo "failed:  ${#FAILED[@]}   ${FAILED[*]:-}"
