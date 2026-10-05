@@ -48,3 +48,7 @@ test/.regression_state
 # Data indices that landed outside data/
 *.crai
 NA12878.final.cram*
+results/
+test/*.bak
+results/
+test/*.bak
