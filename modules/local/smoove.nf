@@ -30,7 +30,7 @@
 
 process SMOOVE {
     tag "${meta.id}"
-    container 'brentp/smoove:latest'
+    container 'brentp/smoove:v0.2.8'
 
     input:
     tuple val(meta), path(bam_file), path(bai_file)

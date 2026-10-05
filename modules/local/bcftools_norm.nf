@@ -1,6 +1,6 @@
 process BCFTOOLS_NORM {
     tag "${meta.id}/${meta.caller}"
-    container 'staphb/bcftools:latest'
+    container 'staphb/bcftools:1.24'
 
     input:
     tuple val(meta), path(vcf_file)
@@ -12,7 +12,8 @@ process BCFTOOLS_NORM {
 
     script:
     """
-    bcftools norm -f ${reference} -m -any ${vcf_file} -Oz -o ${meta.id}.${meta.caller}.normalised.vcf.gz
+    bcftools norm -f ${reference} -m -any ${vcf_file} -Ou \\
+      | bcftools sort -Oz -o ${meta.id}.${meta.caller}.normalised.vcf.gz -
     bcftools index -t ${meta.id}.${meta.caller}.normalised.vcf.gz
     """
 }

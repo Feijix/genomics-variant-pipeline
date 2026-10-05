@@ -15,7 +15,7 @@
 // indel benchmark would silently report zero recall. ONT R10 only.
 process CLAIRS {
     tag "${meta.id}"
-    container 'hkubal/clairs:latest'
+    container 'hkubal/clairs:v0.4.5'
     cpus 8
     memory '32 GB'
 

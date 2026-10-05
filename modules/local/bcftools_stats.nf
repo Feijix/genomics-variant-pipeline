@@ -1,7 +1,7 @@
 // Variant-level QC: counts, Ts/Tv, indel length distribution.
 process BCFTOOLS_STATS {
     tag "${meta.id}.${meta.caller}"
-    container 'staphb/bcftools:latest'
+    container 'staphb/bcftools:1.24'
     publishDir "${params.outdir}/qc/bcftools", mode: 'copy'
 
     input:

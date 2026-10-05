@@ -11,7 +11,7 @@
 
 process CONVERT_DELLY {
     tag "${meta.id}"
-    container 'staphb/bcftools:latest'
+    container 'staphb/bcftools:1.24'
 
     input:
     tuple val(meta), path(bcf_file), path(csi_file)

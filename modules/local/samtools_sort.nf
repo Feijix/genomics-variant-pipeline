@@ -1,6 +1,6 @@
 process SAMTOOLS_SORT {
     tag "${meta.id}"
-    container 'staphb/samtools:latest'
+    container 'staphb/samtools:1.24'
 
     input:
     tuple val(meta), path(sam_file)

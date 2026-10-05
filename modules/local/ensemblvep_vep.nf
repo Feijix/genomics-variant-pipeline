@@ -1,6 +1,6 @@
 process ENSEMBLVEP_VEP {
     tag "${meta.id}/${meta.caller}"
-    container 'ensemblorg/ensembl-vep:latest'
+    container 'ensemblorg/ensembl-vep:release_115.2'
     containerOptions "-v ${params.vep_cache}:/opt/vep/.vep"
     cpus 4
     memory '16 GB'

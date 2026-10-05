@@ -1,6 +1,6 @@
 process MINIMAP2_ALIGN {
     tag "${meta.id}"
-    container 'staphb/minimap2:latest'
+    container 'staphb/minimap2:2.31'
 
     input:
     tuple val(meta), path(reads)

@@ -1,6 +1,6 @@
 process BCFTOOLS_CONCAT_SOMATIC {
     tag "${meta.id}"
-    container 'staphb/bcftools:latest'
+    container 'staphb/bcftools:1.24'
     publishDir "${params.outdir}/somatic", mode: 'copy'
 
     input:

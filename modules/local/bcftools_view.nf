@@ -1,6 +1,6 @@
 process BCFTOOLS_VIEW {
     tag "${meta.id}/${meta.caller}"
-    container 'staphb/bcftools:latest'
+    container 'staphb/bcftools:1.24'
 
     input:
     tuple val(meta), path(vcf_file)

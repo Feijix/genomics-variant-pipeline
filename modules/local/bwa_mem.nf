@@ -1,7 +1,6 @@
 process BWA_MEM {
     tag "${meta.id}"
-    container 'dceoy/bwa-mem2:latest'
-    containerOptions '--entrypoint='
+    container 'nanozoo/bwa-mem2:2.3--a42e075'
     memory '32 GB'
 
     input:

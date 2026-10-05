@@ -1,6 +1,6 @@
 process CLAIR3 {
     tag "${meta.id} (${meta.platform}/${meta.model})"
-    container 'hkubal/clair3:latest'
+    container 'hkubal/clair3:v2.0.2'
     cpus 4
     memory '8 GB'
 

@@ -1,6 +1,6 @@
 process BCFTOOLS_CONCAT {
     tag "${meta.id}"
-    container 'staphb/bcftools:latest'
+    container 'staphb/bcftools:1.24'
 
     input:
     tuple val(meta), path(clair3_vcf), path(dv_vcf)

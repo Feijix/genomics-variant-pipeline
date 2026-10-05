@@ -1,6 +1,6 @@
 process SAMTOOLS_FAIDX {
     tag "samtools faidx"
-    container 'staphb/samtools:latest'
+    container 'staphb/samtools:1.24'
     storeDir 'data/reference'
 
     input:

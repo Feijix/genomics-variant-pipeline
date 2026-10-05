@@ -1,7 +1,6 @@
 process BWA_MEM_INDEX {
     tag "bwa-mem2 index"
-    container 'dceoy/bwa-mem2:latest'
-    containerOptions '--entrypoint='
+    container 'nanozoo/bwa-mem2:2.3--a42e075'
     storeDir 'data/reference'
 
     input:

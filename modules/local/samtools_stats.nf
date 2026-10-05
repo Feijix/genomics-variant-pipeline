@@ -1,7 +1,7 @@
 // Alignment-level QC. MultiQC parses samtools stats natively.
 process SAMTOOLS_STATS {
     tag "${meta.id}"
-    container 'staphb/samtools:latest'
+    container 'staphb/samtools:1.24'
     publishDir "${params.outdir}/qc/samtools", mode: 'copy'
     cpus 2
 

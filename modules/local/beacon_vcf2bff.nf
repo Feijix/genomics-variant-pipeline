@@ -20,7 +20,7 @@
 
 process BEACON_VCF2BFF {
     tag "${meta.id}/${meta.caller}"
-    container 'manuelrueda/beacon2-cbi-tools:latest'
+    container 'manuelrueda/beacon2-cbi-tools:2.0.12'
     containerOptions "-v ${params.beacon_refdata}:/beacon2-cbi-tools-data"
 
     input:
