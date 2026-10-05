@@ -119,7 +119,6 @@ run_config germline_hg002_long \
     --samplesheet data/samplesheet.regression.germline_long.csv \
     --callers clair3 \
     --reference data/reference/GRCh38.chr20.fa \
-    --reference_germline data/reference/GRCh38.chr20.fa \
     --skip_bwa_index true
 
 # 3. Somatic, short read, paired, replicate 1.
@@ -163,7 +162,6 @@ run_config somatic_longread \
     --samplesheet data/samplesheet.hcc1395_ont.csv \
     --callers clairs,deepvariant \
     --reference data/reference/GRCh38.fa \
-    --reference_germline data/reference/GRCh38.fa \
     --skip_bwa_index true
 
 # 7. Structural variants — strict matching (the primary reported figures).

@@ -1,15 +1,10 @@
 /*
  * workflows/variant_calling.nf
- *
- * Phase E: data-attribute-driven routing.
- *
- * The samplesheet describes the data (platform, chemistry, basecaller).
- * The routing config (conf/routing.config, nested under params.routing) maps
- * data attributes to caller dispatch. The workflow body reads the routing
+ * 
+ * The workflow body reads the routing
  * config, picks per-sample callers, and dispatches one channel per caller
- * (Option A).
  *
- * Adding a new caller:
+ * To add a new caller:
  *   1. Add a module in modules/local/
  *   2. Add a routing entry in conf/routing.config
  *   3. Add a per-caller branch label and process call in this file
@@ -47,6 +42,7 @@ include { MANTA_SOMATIC                 } from '../modules/local/manta_somatic.n
 include { STRELKA2_SOMATIC              } from '../modules/local/strelka2_somatic.nf'
 include { BCFTOOLS_CONCAT_SOMATIC       } from '../modules/local/bcftools_concat_somatic.nf'
 include { BCFTOOLS_CONCAT_SOMATIC as BCFTOOLS_CONCAT_CLAIRS } from '../modules/local/bcftools_concat_somatic.nf'
+include { INFER_READ_LENGTH		} from '../modules/local/infer_read_length.nf'
 // ─── Routing helpers (inline) ────────────────────────────────────────────────
 
 /**
@@ -87,21 +83,14 @@ def resolveProfile(key, profiles, originalKey = null) {
     return profile
 }
 
-/**
- * Pick which callers to run for a sample.
- *   1. Per-sample samplesheet `callers` (intersect with profile's tools)
- *   2. CLI --callers all  -> all defaults + alternatives
- *   3. CLI --callers <list>  -> intersect with profile's tools
- *   4. Default -> profile.defaults only
- */
-def selectCallers(profile, sampleOverride, cliCallers, analysis) {
-    def isGermline = (analysis == 'germline')
+def selectCallers(profile, sampleOverride, cliCallers, analysis, toolRegistry) {
+    def isGermline      = (analysis == 'germline')
     def allDefaults     = (isGermline ? profile.defaults     : profile.somatic_defaults)     ?: []
     def allAlternatives = (isGermline ? profile.alternatives : profile.somatic_alternatives) ?: []
 
     // Everything the profile declares, before preconditions are applied. A name
-    // absent from this is a configuration error; a name present here but absent
-    // from `available` was withdrawn by a precondition, which is not an error.
+    // absent from this is an override; a name present here but absent from
+    // `available` was withdrawn by a precondition.
     def declared = ((profile.defaults ?: []) + (profile.alternatives ?: []) +
                     (profile.somatic_defaults ?: []) + (profile.somatic_alternatives ?: []))
 
@@ -116,7 +105,7 @@ def selectCallers(profile, sampleOverride, cliCallers, analysis) {
     def names  = null
     def source = null
     if (sampleOverride) {
-        names  = sampleOverride.split(',').collect { it.trim() } as Set
+        names  = sampleOverride.split(/[;,]/).collect { it.trim() } as Set
         source = 'samplesheet'
     } else if (cliCallers == 'all') {
         return available
@@ -127,14 +116,49 @@ def selectCallers(profile, sampleOverride, cliCallers, analysis) {
         return defaults
     }
 
-    def miss = names - declared*.tool
-    if (miss)
-        error "Callers not declared in profile (${source}): ${miss.join(', ')}"
-    return available.findAll { it.tool in names }
+    def fromProfile = available.findAll { it.tool in names }
+
+    // Named tools the profile declares but a precondition withdrew (requires_normal on a
+    // tumour-only sample) are dropped; report them instead of dropping them silently.
+    def withdrawn = names.findAll { n -> (n in declared*.tool) && !(n in available*.tool) }
+    if (withdrawn) {
+        log.warn "Callers ${withdrawn.join(', ')} (${source}) withdrawn: they require a matched " +
+                 "normal, which this sample lacks."
+    }
+
+    // Named tools the profile does not declare: an explicit override that departs from
+    // attribute-derived selection.
+    def forced = names - declared*.tool
+
+    // A name absent from the tool registry is not a known tool (often a typo); without this
+    // check it would be dispatched to no process and dropped silently.
+    def unknown = forced.findAll { !(it in toolRegistry) }
+    if (unknown) {
+        error "Callers ${unknown.join(', ')} (${source}) are not defined in routing.tools."
+    }
+
+    // Tools that need a profile-supplied model cannot run without one, so forcing them
+    // outside a profile is refused before they fail in their container.
+    def unrunnable = forced.findAll { toolRegistry[it].requires_model }
+    if (unrunnable) {
+        error "Callers ${unrunnable.join(', ')} require a model that only a matching profile " +
+              "supplies; add them to the profile, or route the sample to a profile that " +
+              "includes them."
+    }
+
+    // The remaining forced tools run with default parameters.
+    def runnable = forced - unrunnable
+    if (runnable) {
+        log.warn "Callers ${runnable.join(', ')} (${source}) are not declared in this profile and " +
+                 "were forced; they run with default parameters, which may be inadequate for " +
+                 "this data."
+    }
+    def fromForced = runnable.collect { t ->
+        [tool: t, params: [:], variant_class: toolRegistry[t].variant_class]
+    }
+
+    return fromProfile + fromForced
 }
-
-
-// ─── Workflow ────────────────────────────────────────────────────────────────
 
 workflow VARIANT_CALLING {
 
@@ -171,8 +195,45 @@ workflow VARIANT_CALLING {
         }
         .set { rows }
 
-    // ── 2. Metadata-only pre-pass: validate each subject, emit pairing facts. ──
+        // ── 1b. Read-length inference for samples with no declared platform. ──
     rows
+        .branch { meta, _r, _b, _tv, _tb ->
+            declared:   meta.routing_key != ''
+            undeclared: true
+        }
+        .set { by_decl }
+
+    // run inference on the undeclared branch
+    INFER_READ_LENGTH(
+        by_decl.undeclared.map { meta, r, b, _tv, _tb -> tuple(meta, r.findAll { it }, b) }
+    )
+
+    // set platform from the inferred family, rebuild the key, restore the full tuple
+    INFER_READ_LENGTH.out.inferred
+        .map { meta, family, mean ->
+            meta.platform = family
+            meta.sequencing_type = family
+            meta.platform_inferred = true
+            meta.routing_key = family
+            log.info "Inferred: ${meta.id} -> family '${family}' from mean read length ${mean} bases"
+            tuple(meta.id, meta)
+        }
+        .set { inferred_meta }
+
+    // join the inferred meta back onto the original undeclared rows to recover reads/truth
+    by_decl.undeclared
+        .map { meta, r, b, tv, tb -> tuple(meta.id, r, b, tv, tb) }
+        .combine(inferred_meta, by: 0)
+        .map { _id, r, b, tv, tb, meta -> tuple(meta, r, b, tv, tb) }
+        .set { undeclared_routed }
+
+    // recombine declared + inferred-routed samples
+    by_decl.declared
+        .mix(undeclared_routed)
+        .set { rows_routed }
+
+    // ── 2. Metadata-only pre-pass: validate each subject, emit pairing facts. ──
+    rows_routed
         .map { meta, _r, _b, _tv, _tb ->
             tuple(meta.subject, [id: meta.id, status: meta.status, seqtype: meta.sequencing_type])
         }
@@ -199,7 +260,7 @@ workflow VARIANT_CALLING {
         .set { subject_facts }
 
     // ── 3. Join facts back, resolve analysis, select callers. ──
-    rows
+    rows_routed
         .map { meta, r, b, tv, tb -> tuple(meta.subject, meta, r, b, tv, tb) }
         .combine(subject_facts, by: 0)
         .map { _subj, meta, r, b, tv, tb, hasNormal, hasTumor ->
@@ -209,8 +270,9 @@ workflow VARIANT_CALLING {
             meta.is_matched_normal = (meta.status == 'normal' && hasTumor)
 
             def profile = resolveProfile(meta.routing_key, params.routing.profiles)
-            meta.selected_callers = selectCallers(profile, meta.callers_override, params.callers, meta.analysis)
-
+            meta.selected_callers = selectCallers(profile, meta.callers_override, params.callers, meta.analysis, params.routing.tools)
+	    log.info "Routing: ${meta.id} -> profile '${meta.routing_key}', analysis '${meta.analysis}', callers ${meta.selected_callers*.tool}"
+	    
             if (meta.selected_callers.isEmpty()) {
                 if (meta.status == 'normal' && meta.is_matched_normal) {
                     log.info "Sample '${meta.id}' is a matched normal; callers run on the tumour."
@@ -220,8 +282,12 @@ workflow VARIANT_CALLING {
             }
                 
             def tools = meta.selected_callers*.tool
-            if ('strelka2' in tools && !('manta_somatic' in tools))
-                error "Sample '${meta.id}': strelka2 requires manta_somatic (indel candidates)."
+	    meta.selected_callers.each { e ->
+                (params.routing.tools[e.tool]?.requires ?: []).each { dep ->
+                    if (!(dep in tools))
+                        error "Sample '${meta.id}': ${e.tool} requires ${dep}, which is not selected."
+                }
+            }
 
             tuple(meta, r, b, tv, tb)
         }
@@ -276,16 +342,16 @@ workflow VARIANT_CALLING {
     }
 
     // ── Per-caller invocations (Option A dispatch) ──
-    DEEPVARIANT(per_caller.deepvariant, file(params.reference_germline), file("${params.reference_germline}.fai"))
-    CLAIR3     (per_caller.clair3,      file(params.reference_germline), file("${params.reference_germline}.fai"))
+    DEEPVARIANT(per_caller.deepvariant, file(params.reference), SAMTOOLS_FAIDX.out.fai)
+    CLAIR3     (per_caller.clair3,      file(params.reference), SAMTOOLS_FAIDX.out.fai)
     SNIFFLES2  (per_caller.sniffles2,   file(params.reference), SAMTOOLS_FAIDX.out.fai)
     CUTESV     (per_caller.cutesv,      file(params.reference), SAMTOOLS_FAIDX.out.fai)
-    MANTA      (per_caller.manta,       file(params.reference_germline), file("${params.reference_germline}.fai"))
-    DELLY      (per_caller.delly,       file(params.reference_germline), file("${params.reference_germline}.fai"))
+    MANTA      (per_caller.manta,       file(params.reference), SAMTOOLS_FAIDX.out.fai)
+    DELLY      (per_caller.delly,       file(params.reference), SAMTOOLS_FAIDX.out.fai)
     CONVERT_DELLY(DELLY.out.bcf.join(DELLY.out.csi))
-    SMOOVE     (per_caller.smoove, file(params.reference_germline), file("${params.reference_germline}.fai"))
-    GRIDSS(per_caller.gridss, file(params.reference_germline), file("${params.reference_germline}.fai"))
-    CONVERT_GRIDSS(GRIDSS.out.bnd, file("${params.reference_germline}.fai"))
+    SMOOVE     (per_caller.smoove, file(params.reference), SAMTOOLS_FAIDX.out.fai)
+    GRIDSS(per_caller.gridss, file(params.reference), SAMTOOLS_FAIDX.out.fai)
+    CONVERT_GRIDSS(GRIDSS.out.bnd, SAMTOOLS_FAIDX.out.fai)
     DEEPVARIANT.out.out
         .map { meta, vcf -> tuple(meta + [caller: 'deepvariant'], vcf) }
         .set { tagged_dv }
@@ -405,8 +471,8 @@ workflow VARIANT_CALLING {
     GATK_MUTECT2(
         per_somatic.mutect2,
         ref_calling, fai_calling, GATK_CREATESEQUENCEDICTIONARY.out.dict,
-        [ file(params.germline_resource), file("${params.germline_resource}.tbi") ],
-        [ file(params.pon),               file("${params.pon}.tbi") ]
+        germline_resource,
+        pon
     )
     GATK_FILTERMUTECTCALLS(
         GATK_MUTECT2.out.vcf.join(GATK_MUTECT2.out.tbi).join(GATK_MUTECT2.out.stats),
@@ -443,8 +509,8 @@ workflow VARIANT_CALLING {
 
     CLAIRS(
         per_somatic.clairs,
-        file(params.reference_germline),
-        file("${params.reference_germline}.fai")
+        file(params.reference),
+        SAMTOOLS_FAIDX.out.fai
     )
 
     BCFTOOLS_CONCAT_CLAIRS(
@@ -517,8 +583,8 @@ workflow VARIANT_CALLING {
 
     TRUVARI_BENCH(
         sv_bench_input,
-        file(params.reference_germline),
-        file("${params.reference_germline}.fai")
+        file(params.reference),
+        SAMTOOLS_FAIDX.out.fai
     )
 
     // ── Shared postprocessing ──
