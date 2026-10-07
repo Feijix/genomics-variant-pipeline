@@ -1,0 +1,2 @@
+sample,subject,status,sequencing_type,platform,chemistry,basecaller,fastq_1,fastq_2,aligned_bam,truth_vcf,truth_bed,callers
+HG002_Illumina,HG002,normal,shortread,illumina,wgs,,data/samples/HG002_Illumina_chr20_R1.fastq.gz,data/samples/HG002_Illumina_chr20_R2.fastq.gz,,data/giab/v06/v06.chr20.vcf.gz,data/giab/v06/v06.chr20.bed,
