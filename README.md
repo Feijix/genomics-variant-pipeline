@@ -1,229 +1,102 @@
 # genomics-variant-pipeline
 
-Nextflow DSL2 pipeline for human variant calling. Processes paired-end short-read FASTQ files and produces filtered VCF files compatible with Beacon v2. Supports multiple samples in parallel — each sample produces an independent VCF.
+A Nextflow DSL2 variant calling pipeline for human sequencing data. Each sample declares its provenance (platform, chemistry, basecaller, germline or somatic) in the sample sheet. The pipeline uses that declaration to choose the aligner, the variant callers and the caller models. Small variants and structural variants (SVs) are called, filtered, normalised and annotated, then converted to Beacon v2 BFF (`genomicVariations`) records.
 
-## Pipeline
-
-```
-FASTQ → align (bwa-mem2) → sort & index (samtools) → call variants (DeepVariant) → filter (bcftools) → VCF
-```
-
-All bioinformatics tools run inside Docker containers. Reference indexes (`bwt.2bit.64`, `fai`) and BAM indexes (`bai`) are built automatically on first run and cached — subsequent runs skip indexing entirely.
-
----
+The pipeline was developed for the MSc thesis *Bridging EGA and Beacon v2: A Pipeline for Variant-Level Genomic Discovery* (Instituto Superior Técnico, 2026). Every figure in the thesis was produced by the tag `v1.0-thesis`.
 
 ## Requirements
 
-Only three things need to be installed on the host machine:
-
-| Dependency | Version tested | Notes |
+| Dependency | Tested version | Notes |
 |---|---|---|
-| Java | ≥ 11 | Required by Nextflow |
-| Nextflow | 25.10.4 | See install below |
-| Docker | any recent | All bioinformatics tools run inside containers |
+| Nextflow | 26.04.6 | needs Java 17 or later |
+| Docker | 28.3.3 | every tool runs in a container pinned by version tag |
+| Reference FASTA | GRCh38 no-alt analysis set | development used chromosome 20 |
+| VEP cache | matching the VEP image | `--vep_cache` |
+| Beacon reference data | for bff-tools | `--beacon_refdata`, about 65 GB |
 
-> **Note:** Use `curl` rather than `wget` to download reference files — some `wget` builds lack FTP support.
-
-### Install Nextflow
-
-```bash
-curl -s https://get.nextflow.io | bash
-mv nextflow ~/bin/          # or any directory on your $PATH
-nextflow -version           # verify
-```
-
-### Verify Docker
-
-```bash
-docker run --rm hello-world
-```
-
-If this fails, Docker is not running or your user lacks permission (`sudo usermod -aG docker $USER`, then log out and back in).
-
----
-
-## Quickstart
-
-### 1. Get the reference genome
-
-```bash
-mkdir -p data/reference
-curl -O https://hgdownload.soe.ucsc.edu/goldenPath/hg38/chromosomes/chr20.fa.gz
-gunzip chr20.fa.gz
-mv chr20.fa data/reference/chr20.fa
-```
-
-### 2. Generate synthetic sample reads
-
-`wgsim` ships inside the samtools container — no extra install needed. The `-S` flag sets the random seed, giving each sample a distinct set of variants.
-
-```bash
-mkdir -p data/samples
-
-# HG001 — seed 42
-docker run --rm -v $(pwd)/data:$(pwd)/data -w $(pwd)/data staphb/samtools:latest \
-  wgsim -S 42 -N 1000000 -1 150 -2 150 -e 0.001 -r 0.001 -R 0.0001 \
-  reference/chr20.fa \
-  samples/HG001_R1.fastq samples/HG001_R2.fastq
-
-# HG002 — seed 99
-docker run --rm -v $(pwd)/data:$(pwd)/data -w $(pwd)/data staphb/samtools:latest \
-  wgsim -S 99 -N 1000000 -1 150 -2 150 -e 0.001 -r 0.001 -R 0.0001 \
-  reference/chr20.fa \
-  samples/HG002_R1.fastq samples/HG002_R2.fastq
-
-# Compress
-gzip data/samples/HG001_R1.fastq data/samples/HG001_R2.fastq \
-     data/samples/HG002_R1.fastq data/samples/HG002_R2.fastq
-```
-
-> **Note on synthetic data:** wgsim places variants randomly with no biological model. Ts/Tv ratio will be ~0.50 (random chance) rather than the ~2.0–2.1 expected from real human WGS data. This is expected and correct — use GIAB reads for biological validation.
-
-### 3. Create the samplesheet
-
-```bash
-cat > data/samplesheet.csv << EOF
-sample,fastq_1,fastq_2
-HG001,data/samples/HG001_R1.fastq.gz,data/samples/HG001_R2.fastq.gz
-HG002,data/samples/HG002_R1.fastq.gz,data/samples/HG002_R2.fastq.gz
-EOF
-```
-
-Add or remove rows to process more or fewer samples. Each row runs independently through the full pipeline in parallel.
-
-### 4. Run
-
-```bash
-nextflow run main.nf -profile docker
-```
-
-First run pulls Docker images and builds reference indexes (~10 min depending on connection). Subsequent runs skip both.
-
-Expected output:
-
-```
-[skipped  ] indexReference  | 1 of 1, stored ✔
-[skipped  ] faiReference    | 1 of 1, stored ✔
-[xx/xxxxxx] align           | 2 of 2 ✔
-[xx/xxxxxx] sortBam         | 2 of 2 ✔
-[xx/xxxxxx] callVariants    | 2 of 2 ✔
-[xx/xxxxxx] vcfQc           | 2 of 2 ✔
-```
-
----
-
-## Parameters
-
-| Parameter | Default | Description |
-|---|---|---|
-| `--samplesheet` | `data/samplesheet.csv` | Sample manifest |
-| `--reference` | `data/reference/chr20.fa` | Reference FASTA |
-| `--outdir` | `data/outputs` | Output directory |
-
-Override at runtime:
+## Running
 
 ```bash
 nextflow run main.nf -profile docker \
-  --reference data/reference/GRCh38.fa \
-  --outdir results/
+  --samplesheet samplesheet.csv \
+  --reference data/reference/chr20.fa \
+  --vep_cache /path/to/vep_cache \
+  --beacon_refdata /path/to/beacon_refdata \
+  --outdir results
 ```
 
----
+For whole genomes, add the `wgs` profile (`-profile docker,wgs`). It sets the Mutect2 resources to null, because the default resources cover chromosome 20 only. Supply whole-genome files with `--germline_resource` and `--pon`.
 
-## Output
+Without `--callers`, each sample runs the default tools of its profile. `--callers deepvariant,clair3` names tools explicitly, and `--callers all` runs every tool the profile lists.
 
-```
-data/outputs/
-├── bam/
-│   ├── <sample>.sorted.bam
-│   └── <sample>.sorted.bam.bai
-├── vcf/
-│   └── <sample>.vcf.gz
-└── qc/
-    ├── <sample>.final.vcf.gz   ← QUAL > 20 filtered
-    └── <sample>.stats.txt
-```
+## Sample sheet
 
-One set of outputs per sample, named by the `sample` column in the samplesheet.
-
----
-
-## Inspecting Results
-
-`bcftools` and `samtools` are not required on the host. Use the same containers the pipeline uses:
-
-```bash
-# Add to ~/.bashrc for convenience
-alias bcftools='docker run --rm -v $(pwd):$(pwd) -w $(pwd) staphb/bcftools:latest bcftools'
-alias samtools='docker run --rm -v $(pwd):$(pwd) -w $(pwd) staphb/samtools:latest samtools'
-
-source ~/.bashrc
-```
-
-```bash
-# Variant counts per sample
-bcftools stats data/outputs/qc/HG001.final.vcf.gz | grep "^SN"
-bcftools stats data/outputs/qc/HG002.final.vcf.gz | grep "^SN"
-
-# Ts/Tv ratio
-# ~0.50 expected for synthetic data, ~2.0-2.1 for real WGS data
-bcftools stats data/outputs/qc/HG001.final.vcf.gz | grep "^TSTV"
-bcftools stats data/outputs/qc/HG002.final.vcf.gz | grep "^TSTV"
-
-# BAM alignment stats
-samtools flagstat data/outputs/bam/HG001.sorted.bam
-samtools flagstat data/outputs/bam/HG002.sorted.bam
-```
-
----
-
-## Containers
-
-| Process | Image |
+| Column | Content |
 |---|---|
-| indexReference | `dceoy/bwa-mem2:latest` |
-| faiReference | `staphb/samtools:latest` |
-| align | `dceoy/bwa-mem2:latest` |
-| sortBam | `staphb/samtools:latest` |
-| callVariants | `google/deepvariant:1.5.0` |
-| vcfQc | `staphb/bcftools:latest` |
+| `sample` | sample identifier, used in output names |
+| `subject` | individual; tumour and normal samples of one subject are paired |
+| `status` | `normal` or `tumour` (germline samples are `normal`) |
+| `sequencing_type` | `shortread` or `longread`; when empty, inferred from read length (500 bp threshold) |
+| `platform` | e.g. `illumina`, `ont`, `pacbio` |
+| `chemistry` | e.g. `wgs`, `r10.4.1`, `r9.4.1`, `hifi` |
+| `basecaller` | e.g. `dorado_sup`; optional, used when the caller model depends on it |
+| `fastq_1`, `fastq_2` | reads; `fastq_2` is empty for single-end and long reads |
+| `aligned_bam` | an aligned BAM, used in place of FASTQ to skip alignment |
+| `truth_vcf`, `truth_bed` | optional truth set and confident regions; when present, the sample is benchmarked |
+| `callers` | optional per-sample tool list, overriding the profile defaults |
 
----
+## Routing
 
-## Troubleshooting
+`conf/routing.config` holds two blocks.
 
-**`ERROR! Unable to open the file: chr20.fa.bwt.2bit.64`**
-The reference index is missing. The pipeline builds it automatically — if this error appears, the `indexReference` process failed. Check the `work/` logs.
+- `profiles`, keyed `platform/chemistry/basecaller`. Each profile lists germline and somatic tools, split into defaults and alternatives. When no profile matches the full key, trailing segments are dropped one at a time and a warning is printed. Alias profiles point to another profile with `falls_back_to`. A sample with no platform is routed to the `shortread` or `longread` family profile from its inferred read length.
+- `tools`, a registry of tool properties: `variant_class` (`small` or `sv`), `requires_model` (the profile must name a model), and `requires` (tools that must also be selected, e.g. Strelka2 requires Manta in somatic mode).
 
-**`ValueError: NOT_FOUND: could not load fasta and/or fai`**
-The `.fai` index was not staged into DeepVariant's work directory. Ensure `faiReference` completed successfully before `callVariants` — handled automatically in the current pipeline version.
+A tool whose precondition fails (e.g. `requires_normal` for a tumour-only sample) is withdrawn with a warning. A selection that resolves to zero tools, an unknown tool name, or a missing dependency stops the run with an error. Every sample prints one line, `Routing: <sample> -> profile ..., callers [...]`.
 
-**`[E::idx_find_and_load] Could not retrieve index file for '*.bam'`**
-The `.bai` was not passed to `callVariants`. Ensure `sortBam` emits both the `.bam` and `.bai` in its output tuple.
+Tools available per data type (`conf/routing.config` is the authoritative list of defaults and alternatives):
 
-**`No non-empty sample name found in the input reads`**
-Read group tags are missing from the BAM. The `align` process adds them via `-R "@RG\tID:...\tSM:...\tPL:ILLUMINA"`. If you see this warning, check that the `-R` flag is present in the align script.
+| Data | Germline small variants | Germline SVs | Somatic |
+|---|---|---|---|
+| Illumina short reads | DeepVariant | Manta, DELLY, smoove, GRIDSS | Mutect2, Strelka2 (tumour-normal only) |
+| ONT R10.4.1 | DeepVariant (`ONT_R104`), Clair3 | Sniffles2, cuteSV | ClairS |
+| ONT R9.4.1 | Clair3 | Sniffles2, cuteSV | ClairS |
+| PacBio HiFi | DeepVariant, Clair3 | Sniffles2, cuteSV | ClairS |
 
-**Ts/Tv is ~0.50 instead of ~2.0**
-Expected when using synthetic data generated by `wgsim`. This is not a pipeline error — wgsim places variants randomly with no biological model. Run with real GIAB reads to get a biologically valid Ts/Tv ratio.
+## Steps
 
----
+1. Alignment with bwa-mem2 (short reads) or minimap2 (long reads), then sorting and indexing with samtools. Skipped when `aligned_bam` is given.
+2. Variant calling with the selected tools.
+3. Small variants: bcftools keeps PASS records, normalises them (`bcftools norm`) and sorts them. VEP annotates the published VCF. bff-tools converts the normalised VCF to BFF and re-annotates it with snpEff.
+4. SVs: per-tool VCFs are merged with SURVIVOR, and `scripts/sv_to_bff.py` converts them to BFF.
+5. Benchmarking, for samples with a truth set: hap.py (germline small variants), som.py (somatic), Truvari (SVs).
 
-## Status
+## Layout
 
-- [x] Short-read pipeline (bwa-mem2 + DeepVariant WGS)
-- [x] Multi-sample support — N samples run in parallel, one VCF each
-- [ ] Long-read support (Clair3)
-- [ ] VCF normalization and annotation (VEP)
-- [ ] Beacon v2 output
+| Path | Content |
+|---|---|
+| `main.nf` | entry point and sample sheet parsing |
+| `workflows/` | sub-workflows (variant calling, post-processing) |
+| `modules/` | one process per tool |
+| `conf/routing.config` | routing profiles and the tool registry |
+| `nextflow.config` | parameters, resources, containers, profiles |
+| `scripts/` | SV-to-BFF converter and EGA metadata scripts |
+| `test/` | regression suite and baselines |
 
----
+## Mutect2 resources
 
-## Validation
+The defaults in `nextflow.config` are the gnomAD allele-frequency file (`af-only-gnomad`) and the 1000 Genomes panel of normals distributed with GATK, both restricted to chromosome 20. Both are optional. Without them, Mutect2 runs with no germline resource and no panel of normals.
 
-Tested with synthetic chr20 reads generated by `wgsim` from GRCh38 chr20 (UCSC hg38).
-Two samples (HG001/HG002) with different random seeds confirmed independent variant sets.
+## Regression suite
 
-For biological validation, use [GIAB](https://www.nist.gov/programs-projects/genome-bottle) truth sets:
-- HG001 (NA12878): `https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/NA12878_HG001/NISTv3.3.2/GRCh38/`
-- HG002 (NA24385): `https://ftp-trace.ncbi.nlm.nih.gov/ReferenceSamples/giab/release/AshkenazimTrio/HG002_NA24385_son/NISTv3.3.2/GRCh38/`
+`test/regression.sh` runs ten configurations (germline short and long reads, somatic tumour-normal and tumour-only, SVs, and routing by inferred read length). It compares each metric with the committed baselines in `test/baselines/` and exits with a non-zero status on any difference. The sequencing data and truth sets are not in the repository. The sample sheets expect them under `data/`, and the thesis lists their public sources.
+
+## EGA metadata
+
+`ega_to_samplesheet.py` builds a sample sheet from an EGA dataset's public metadata. `ega_to_beacon_xlsx.py` maps the same metadata to the Beacon v2 metadata template. From archive metadata alone, three of the six Beacon entities validate (individuals, datasets, cohorts). Biosamples, runs and analyses need fields the archive does not provide.
+
+## Known limitations
+
+- Images are pinned by version tag, not by digest.
+- Read-length inference selects only the short- or long-read family, not the chemistry or the caller model.
+- Tested on one shared Ubuntu server with the local executor. No cluster executor has been tested.
