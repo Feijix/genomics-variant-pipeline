@@ -1,14 +1,14 @@
-2026-07-31 13:36:38,287 [INFO] Truvari v5.4.0
-2026-07-31 13:36:38,287 [INFO] Command /usr/local/bin/truvari bench -b GRCh38_HG2-T2TQ100-V1.1_stvar.vcf.gz -c HG002_Illumina.smoove.pass.vcf.gz -o HG002_Illumina.smoove.truvari --includebed HG002_SV_chr20.benchmark.bed -f GRCh38.chr20.fa --passonly --sizemin 50 --sizemax 50000 --pctseq 0 --dup-to-ins --pctsize 0.7 --refdist 500 --pick single
-2026-07-31 13:36:38,289 [INFO] Params:
+2026-10-05 19:45:54,305 [INFO] Truvari v5.4.0
+2026-10-05 19:45:54,306 [INFO] Command /usr/local/bin/truvari bench -b GRCh38_HG2-T2TQ100-V1.1_stvar.vcf.gz -c HG002_Illumina.smoove.pass.vcf.gz -o HG002_Illumina.smoove.truvari --includebed HG002_SV_chr20.benchmark.bed -f GRCh38.chr20.fa --passonly --sizemin 50 --sizemax 50000 --pctseq 0 --dup-to-ins --pctsize 0.7 --refdist 500 --pick single
+2026-10-05 19:45:54,308 [INFO] Params:
 {
-    "base": "/home/afonso/genomics-variant-pipeline/work/ed/17287bde18ab3012d46a521951abec/GRCh38_HG2-T2TQ100-V1.1_stvar.vcf.gz",
-    "comp": "/home/afonso/genomics-variant-pipeline/work/ed/17287bde18ab3012d46a521951abec/HG002_Illumina.smoove.pass.vcf.gz",
+    "base": "/home/afonso/genomics-variant-pipeline/work/76/a01bd3b05abbfb434c5c2d1c15c47b/GRCh38_HG2-T2TQ100-V1.1_stvar.vcf.gz",
+    "comp": "/home/afonso/genomics-variant-pipeline/work/76/a01bd3b05abbfb434c5c2d1c15c47b/HG002_Illumina.smoove.pass.vcf.gz",
     "output": "HG002_Illumina.smoove.truvari",
-    "includebed": "/home/afonso/genomics-variant-pipeline/work/ed/17287bde18ab3012d46a521951abec/HG002_SV_chr20.benchmark.bed",
+    "includebed": "/home/afonso/genomics-variant-pipeline/work/76/a01bd3b05abbfb434c5c2d1c15c47b/HG002_SV_chr20.benchmark.bed",
     "extend": 0,
     "debug": false,
-    "reference": "/home/afonso/genomics-variant-pipeline/work/ed/17287bde18ab3012d46a521951abec/GRCh38.chr20.fa",
+    "reference": "/home/afonso/genomics-variant-pipeline/work/76/a01bd3b05abbfb434c5c2d1c15c47b/GRCh38.chr20.fa",
     "refdist": 500,
     "pctseq": 0.0,
     "pctsize": 0.7,
@@ -36,10 +36,10 @@
     "skip_gt": false,
     "max_resolve": 25000
 }
-2026-07-31 13:36:38,484 [INFO] Including 213 bed regions
-2026-07-31 13:36:45,212 [INFO] Zipped 101076 variants Counter({'base': 100995, 'comp': 81})
-2026-07-31 13:36:45,212 [INFO] 528 chunks of 101076 variants Counter({'__filtered': 100193, 'base': 803, 'comp': 80})
-2026-07-31 13:36:45,781 [INFO] Stats: {
+2026-10-05 19:45:54,530 [INFO] Including 213 bed regions
+2026-10-05 19:46:01,267 [INFO] Zipped 101076 variants Counter({'base': 100995, 'comp': 81})
+2026-10-05 19:46:01,267 [INFO] 528 chunks of 101076 variants Counter({'__filtered': 100193, 'base': 803, 'comp': 80})
+2026-10-05 19:46:01,595 [INFO] Stats: {
     "TP-base": 61,
     "TP-comp": 61,
     "FP": 16,
@@ -68,4 +68,4 @@
         }
     }
 }
-2026-07-31 13:36:45,781 [INFO] Finished bench
+2026-10-05 19:46:01,595 [INFO] Finished bench

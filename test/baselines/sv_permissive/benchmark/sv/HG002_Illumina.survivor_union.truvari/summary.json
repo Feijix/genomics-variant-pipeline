@@ -1,21 +1,21 @@
 {
-    "TP-base": 158,
-    "TP-comp": 158,
-    "FP": 73,
-    "FN": 645,
-    "precision": 0.683982683982684,
-    "recall": 0.19676214196762143,
-    "f1": 0.3056092843326886,
+    "TP-base": 166,
+    "TP-comp": 166,
+    "FP": 83,
+    "FN": 637,
+    "precision": 0.6666666666666666,
+    "recall": 0.20672478206724781,
+    "f1": 0.3155893536121672,
     "base cnt": 803,
-    "comp cnt": 231,
+    "comp cnt": 249,
     "TP-comp_TP-gt": 58,
-    "TP-comp_FP-gt": 100,
+    "TP-comp_FP-gt": 108,
     "TP-base_TP-gt": 58,
-    "TP-base_FP-gt": 100,
-    "gt_concordance": 0.3670886075949367,
+    "TP-base_FP-gt": 108,
+    "gt_concordance": 0.3493975903614458,
     "gt_matrix": {
         "(0, 1)": {
-            "(None, None)": 35,
+            "(None, None)": 38,
             "(0, 1)": 15,
             "(1, 1)": 1
         },
@@ -26,7 +26,7 @@
         },
         "(1, 0)": {
             "(0, 1)": 19,
-            "(None, None)": 30,
+            "(None, None)": 35,
             "(1, 1)": 1,
             "(0, 0)": 1
         }

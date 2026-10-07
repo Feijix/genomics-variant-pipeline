@@ -1,14 +1,14 @@
-2026-07-31 13:36:40,452 [INFO] Truvari v5.4.0
-2026-07-31 13:36:40,453 [INFO] Command /usr/local/bin/truvari bench -b GRCh38_HG2-T2TQ100-V1.1_stvar.vcf.gz -c HG002_Illumina.sv_union.vcf.gz -o HG002_Illumina.survivor_union.truvari --includebed HG002_SV_chr20.benchmark.bed -f GRCh38.chr20.fa --passonly --sizemin 50 --sizemax 50000 --pctseq 0 --dup-to-ins --pctsize 0.7 --refdist 500 --pick single
-2026-07-31 13:36:40,454 [INFO] Params:
+2026-10-05 19:56:04,066 [INFO] Truvari v5.4.0
+2026-10-05 19:56:04,066 [INFO] Command /usr/local/bin/truvari bench -b GRCh38_HG2-T2TQ100-V1.1_stvar.vcf.gz -c HG002_Illumina.sv_union.vcf.gz -o HG002_Illumina.survivor_union.truvari --includebed HG002_SV_chr20.benchmark.bed -f GRCh38.chr20.fa --passonly --sizemin 50 --sizemax 50000 --pctseq 0 --dup-to-ins --pctsize 0.7 --refdist 500 --pick single
+2026-10-05 19:56:04,068 [INFO] Params:
 {
-    "base": "/home/afonso/genomics-variant-pipeline/work/df/6eb7fcc3cd7e9b4192ed09ea2280bb/GRCh38_HG2-T2TQ100-V1.1_stvar.vcf.gz",
-    "comp": "/home/afonso/genomics-variant-pipeline/work/df/6eb7fcc3cd7e9b4192ed09ea2280bb/HG002_Illumina.sv_union.vcf.gz",
+    "base": "/home/afonso/genomics-variant-pipeline/work/bb/2270b354f733a17b966f7c7634e1c1/GRCh38_HG2-T2TQ100-V1.1_stvar.vcf.gz",
+    "comp": "/home/afonso/genomics-variant-pipeline/work/bb/2270b354f733a17b966f7c7634e1c1/HG002_Illumina.sv_union.vcf.gz",
     "output": "HG002_Illumina.survivor_union.truvari",
-    "includebed": "/home/afonso/genomics-variant-pipeline/work/df/6eb7fcc3cd7e9b4192ed09ea2280bb/HG002_SV_chr20.benchmark.bed",
+    "includebed": "/home/afonso/genomics-variant-pipeline/work/bb/2270b354f733a17b966f7c7634e1c1/HG002_SV_chr20.benchmark.bed",
     "extend": 0,
     "debug": false,
-    "reference": "/home/afonso/genomics-variant-pipeline/work/df/6eb7fcc3cd7e9b4192ed09ea2280bb/GRCh38.chr20.fa",
+    "reference": "/home/afonso/genomics-variant-pipeline/work/bb/2270b354f733a17b966f7c7634e1c1/GRCh38.chr20.fa",
     "refdist": 500,
     "pctseq": 0.0,
     "pctsize": 0.7,
@@ -36,39 +36,41 @@
     "skip_gt": false,
     "max_resolve": 25000
 }
-2026-07-31 13:36:40,625 [INFO] Including 213 bed regions
-2026-07-31 13:36:47,279 [INFO] Zipped 101230 variants Counter({'base': 100995, 'comp': 235})
-2026-07-31 13:36:47,279 [INFO] 548 chunks of 101230 variants Counter({'__filtered': 100197, 'base': 803, 'comp': 230})
-2026-07-31 13:36:47,753 [INFO] Stats: {
-    "TP-base": 158,
-    "TP-comp": 158,
-    "FP": 72,
-    "FN": 645,
-    "precision": 0.6869565217391305,
-    "recall": 0.19676214196762143,
-    "f1": 0.3059051306873185,
+2026-10-05 19:56:04,268 [INFO] Including 213 bed regions
+2026-10-05 19:56:11,036 [INFO] Zipped 101248 variants Counter({'base': 100995, 'comp': 253})
+2026-10-05 19:56:11,037 [INFO] 549 chunks of 101248 variants Counter({'__filtered': 100196, 'base': 803, 'comp': 249})
+2026-10-05 19:56:11,552 [INFO] Stats: {
+    "TP-base": 166,
+    "TP-comp": 166,
+    "FP": 83,
+    "FN": 637,
+    "precision": 0.6666666666666666,
+    "recall": 0.20672478206724781,
+    "f1": 0.3155893536121672,
     "base cnt": 803,
-    "comp cnt": 230,
-    "TP-comp_TP-gt": 51,
-    "TP-comp_FP-gt": 107,
-    "TP-base_TP-gt": 51,
-    "TP-base_FP-gt": 107,
-    "gt_concordance": 0.3227848101265823,
+    "comp cnt": 249,
+    "TP-comp_TP-gt": 58,
+    "TP-comp_FP-gt": 108,
+    "TP-base_TP-gt": 58,
+    "TP-base_FP-gt": 108,
+    "gt_concordance": 0.3493975903614458,
     "gt_matrix": {
         "(0, 1)": {
-            "(None, None)": 36,
-            "(0, 1)": 13,
-            "(1, 1)": 2
+            "(None, None)": 38,
+            "(0, 1)": 15,
+            "(1, 1)": 1
         },
         "(1, 1)": {
+            "(1, 1)": 24,
             "(None, None)": 31,
-            "(1, 1)": 20,
-            "(0, 1)": 5
+            "(0, 1)": 1
         },
         "(1, 0)": {
-            "(0, 1)": 18,
-            "(None, None)": 33
+            "(0, 1)": 19,
+            "(None, None)": 35,
+            "(1, 1)": 1,
+            "(0, 0)": 1
         }
     }
 }
-2026-07-31 13:36:47,753 [INFO] Finished bench
+2026-10-05 19:56:11,552 [INFO] Finished bench

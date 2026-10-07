@@ -1,0 +1,63 @@
+2026-10-05 19:12:44,567 [INFO] Truvari v5.4.0
+2026-10-05 19:12:44,567 [INFO] Command /usr/local/bin/truvari bench -b GRCh38_HG2-T2TQ100-V1.1_stvar.vcf.gz -c HG002_Illumina.gridss.pass.vcf.gz -o HG002_Illumina.gridss.truvari --includebed HG002_SV_chr20.benchmark.bed -f GRCh38.chr20.fa --passonly --sizemin 50 --sizemax 50000 --pctseq 0.7 --pctsize 0.7 --refdist 500 --pick single
+2026-10-05 19:12:44,569 [INFO] Params:
+{
+    "base": "/home/afonso/genomics-variant-pipeline/work/18/201fb84e47eea40beab4ded22094a1/GRCh38_HG2-T2TQ100-V1.1_stvar.vcf.gz",
+    "comp": "/home/afonso/genomics-variant-pipeline/work/18/201fb84e47eea40beab4ded22094a1/HG002_Illumina.gridss.pass.vcf.gz",
+    "output": "HG002_Illumina.gridss.truvari",
+    "includebed": "/home/afonso/genomics-variant-pipeline/work/18/201fb84e47eea40beab4ded22094a1/HG002_SV_chr20.benchmark.bed",
+    "extend": 0,
+    "debug": false,
+    "reference": "/home/afonso/genomics-variant-pipeline/work/18/201fb84e47eea40beab4ded22094a1/GRCh38.chr20.fa",
+    "refdist": 500,
+    "pctseq": 0.7,
+    "pctsize": 0.7,
+    "pctovl": 0.0,
+    "typeignore": false,
+    "no_roll": false,
+    "chunksize": 1000,
+    "bSample": "HG002",
+    "cSample": null,
+    "dup_to_ins": false,
+    "bnddist": 100,
+    "sizemin": 50,
+    "sizefilt": 30,
+    "sizemax": 50000,
+    "passonly": true,
+    "no_ref": false,
+    "pick": "single",
+    "ignore_monref": true,
+    "check_multi": true,
+    "check_monref": true,
+    "no_single_bnd": true,
+    "write_resolved": false,
+    "decompose": true,
+    "short_circuit": false,
+    "skip_gt": true,
+    "max_resolve": 25000
+}
+2026-10-05 19:12:44,789 [INFO] Including 213 bed regions
+2026-10-05 19:12:51,156 [INFO] Zipped 102202 variants Counter({'base': 100995, 'comp': 1207})
+2026-10-05 19:12:51,157 [INFO] 576 chunks of 102202 variants Counter({'__filtered': 101254, 'base': 803, 'comp': 145})
+2026-10-05 19:12:51,602 [INFO] Stats: {
+    "TP-base": 58,
+    "TP-comp": 58,
+    "FP": 26,
+    "FN": 745,
+    "precision": 0.6904761904761905,
+    "recall": 0.0722291407222914,
+    "f1": 0.13077790304396844,
+    "base cnt": 803,
+    "comp cnt": 84,
+    "TP-comp_TP-gt": 0,
+    "TP-comp_FP-gt": 58,
+    "TP-base_TP-gt": 0,
+    "TP-base_FP-gt": 58,
+    "gt_concordance": 0.0,
+    "gt_matrix": {
+        "None": {
+            "None": 58
+        }
+    }
+}
+2026-10-05 19:12:51,602 [INFO] Finished bench
