@@ -379,10 +379,12 @@ workflow VARIANT_CALLING {
         .groupTuple()
         .filter { _id, _metas, vcfs -> vcfs.size() >= 2 }
         .map { id, metas, vcfs ->
-            def base_meta = metas[0].findAll { k, _v ->
+            def priority = ['deepvariant', 'clair3']
+            def pairs = [metas, vcfs].transpose().sort { pair -> priority.indexOf(pair[0].caller) }
+            def base_meta = pairs[0][0].findAll { k, _v ->
                 k in ['id','sequencing_type','platform','chemistry','basecaller','routing_key']
             }
-            tuple(base_meta, vcfs[0], vcfs[1])
+            tuple(base_meta, pairs[0][1], pairs[1][1])
         }
         .set { ensemble_pair }
 
